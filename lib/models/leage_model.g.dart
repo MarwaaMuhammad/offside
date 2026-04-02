@@ -23,13 +23,14 @@ class LeagueAdapter extends TypeAdapter<League> {
       matches: (fields[3] as List).cast<Match2>(),
       topScorers: (fields[4] as List?)?.cast<Player>(),
       topAssistants: (fields[5] as List?)?.cast<Player>(),
+      backendId: fields[6] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, League obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(7)
       ..writeByte(0)
       ..write(obj.logo)
       ..writeByte(1)
@@ -41,7 +42,9 @@ class LeagueAdapter extends TypeAdapter<League> {
       ..writeByte(4)
       ..write(obj.topScorers)
       ..writeByte(5)
-      ..write(obj.topAssistants);
+      ..write(obj.topAssistants)
+      ..writeByte(6)
+      ..write(obj.backendId);
   }
 
   @override

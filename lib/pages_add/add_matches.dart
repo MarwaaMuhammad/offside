@@ -5,6 +5,10 @@ import 'package:offside/models/match_model.dart';
 import 'package:offside/models/team_model.dart';
 import 'package:intl/intl.dart';
 import 'package:offside/pages_details/details_league.dart';
+// ── NEW ──────────────────────────────────────────────────────────────
+import 'package:offside/services/sync_service.dart';
+import 'package:offside/services/api_service.dart';
+// ─────────────────────────────────────────────────────────────────────
 
 class CreateMatchPage extends StatefulWidget {
   final List<Team> teams;
@@ -24,11 +28,12 @@ class CreateMatchPage extends StatefulWidget {
 
 class _CreateMatchPageState extends State<CreateMatchPage> {
   List<Match2> matches = [];
+  bool _isSyncing = false; // shows loading indicator during backend sync
 
   void createMatch() {
     setState(() {
       matches.clear();
-      final shuffledTeams = List<Team>.from(widget.teams)..shuffle(); // Shuffle
+      final shuffledTeams = List<Team>.from(widget.teams)..shuffle();
 
       for (int i = 0; i < shuffledTeams.length; i++) {
         for (int j = i + 1; j < shuffledTeams.length; j++) {
@@ -43,22 +48,23 @@ class _CreateMatchPageState extends State<CreateMatchPage> {
   }
 
   Future<void> pickDateTime(int index) async {
+    // Pick date
     DateTime? pickedDate = await showDatePicker(
       context: context,
       initialDate: matches[index].date,
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
     );
-
     if (pickedDate == null) return;
 
+    // Pick time
     TimeOfDay? pickedTime = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(matches[index].date),
     );
-
     if (pickedTime == null) return;
 
+    // Merge date with time
     final newDateTime = DateTime(
       pickedDate.year,
       pickedDate.month,
@@ -76,20 +82,63 @@ class _CreateMatchPageState extends State<CreateMatchPage> {
     });
   }
 
+  // ── UPDATED saveMatches: saves locally THEN syncs to backend ──────
   Future<void> saveMatches() async {
-    final leagueBox = await Hive.openBox<League>('leagues');
-    League league = League(
-      logo: widget.leagueLogo,
-      name: widget.leagueName,
-      teams: widget.teams,
-      matches: matches,
-    );
-    await leagueBox.add(league);
-    await leagueBox.flush();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("✅ League '${widget.leagueName}' with matches saved!")),
-    );
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => LeaguePage(league: league)));
+    setState(() => _isSyncing = true);
+
+    try {
+      // 1. Save locally to Hive first (always works offline)
+      final leagueBox = await Hive.openBox<League>('leagues');
+      final league = League(
+        logo: widget.leagueLogo,
+        name: widget.leagueName,
+        teams: widget.teams,
+        matches: matches,
+      );
+      await leagueBox.add(league);
+      await leagueBox.flush(); // Ensure immediate save
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("✅ League '${widget.leagueName}' saved locally!")),
+      );
+
+      // 2. Now sync to backend
+      await SyncService.syncLeagueToBackend(league);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("☁️  League synced to backend!"),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => LeaguePage(league: league)),
+      );
+    } on ApiException catch (e) {
+      // Backend failed but local save succeeded — still navigate
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("⚠️  Saved locally but backend sync failed: ${e.message}"),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+
+      final leagueBox = Hive.box<League>('leagues');
+      final league = leagueBox.values.last;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => LeaguePage(league: league)),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("❌ Error: $e")),
+      );
+    } finally {
+      if (mounted) setState(() => _isSyncing = false);
+    }
   }
 
   @override
@@ -100,10 +149,19 @@ class _CreateMatchPageState extends State<CreateMatchPage> {
       appBar: AppBar(
         title: Text("Create Matches - ${widget.leagueName}"),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.save, color: Colors.black),
-            onPressed: matches.isEmpty ? null : saveMatches,
-          ),
+          _isSyncing
+              ? const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              : IconButton(
+                  icon: const Icon(Icons.save, color: Colors.black),
+                  onPressed: matches.isEmpty ? null : saveMatches,
+                ),
         ],
       ),
       body: Column(
@@ -129,12 +187,14 @@ class _CreateMatchPageState extends State<CreateMatchPage> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               CircleAvatar(
-                                backgroundImage: AssetImage(match.homeTeam.logo),
+                                backgroundImage:
+                                    AssetImage(match.homeTeam.logo),
                                 radius: 18,
                               ),
                               const SizedBox(width: 5),
                               CircleAvatar(
-                                backgroundImage: AssetImage(match.awayTeam.logo),
+                                backgroundImage:
+                                    AssetImage(match.awayTeam.logo),
                                 radius: 18,
                               ),
                             ],
@@ -148,7 +208,8 @@ class _CreateMatchPageState extends State<CreateMatchPage> {
                             style: const TextStyle(color: Colors.grey),
                           ),
                           trailing: IconButton(
-                            icon: const Icon(Icons.edit_calendar, color: Colors.blueAccent),
+                            icon: const Icon(Icons.edit_calendar,
+                                color: Colors.blueAccent),
                             onPressed: () => pickDateTime(index),
                           ),
                         ),

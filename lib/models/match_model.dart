@@ -14,7 +14,7 @@ class Match2 extends HiveObject {
 
   @HiveField(2)
   DateTime date;
-  
+
   @HiveField(3)
   int? homeTeamScore;
 
@@ -30,14 +30,18 @@ class Match2 extends HiveObject {
   @HiveField(7)
   List<Event> eventsAway;
 
+  /// The backend UUID for this match. Set after syncing to the server.
+  @HiveField(8)
+  String? backendId;
+
   Match2({
     required this.homeTeam,
     required this.awayTeam,
     required this.date,
-    this.homeTeamScore=0,
-    this.awayTeamScore=0,
+    this.homeTeamScore = 0,
+    this.awayTeamScore = 0,
     this.eventsHome = const [],
     this.eventsAway = const [],
+    this.backendId,
   });
 }
-

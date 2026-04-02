@@ -25,6 +25,11 @@ class League extends HiveObject {
   @HiveField(5)
   List<Player>? topAssistants;
 
+  /// The backend UUID returned after syncing to the server.
+  /// Null until the league has been pushed to the backend.
+  @HiveField(6)
+  String? backendId;
+
   League({
     required this.logo,
     required this.name,
@@ -32,11 +37,14 @@ class League extends HiveObject {
     required this.matches,
     this.topScorers,
     this.topAssistants,
+    this.backendId,
   });
 
-  /// 🔥 دي الدالة اللي بتعيد حساب الترتيب
+  // ─────────────────────────────────────────────────
+  //  Standings calculation (unchanged)
+  // ─────────────────────────────────────────────────
   void updateStandings() {
-    // صفر الإحصائيات الأول
+    // Reset all stats first
     for (var t in teams) {
       t.played = 0;
       t.wins = 0;
@@ -47,9 +55,10 @@ class League extends HiveObject {
       t.points = 0;
     }
 
+    // Iterate over matches and calculate
     for (var m in matches) {
       if (m.homeTeamScore == null || m.awayTeamScore == null) {
-        continue; // Skip if scores are null
+        continue; // If the match hasn't been played, skip it
       }
 
       final home = teams.firstWhere(
@@ -67,7 +76,6 @@ class League extends HiveObject {
       home.played = (home.played ?? 0) + 1;
       away.played = (away.played ?? 0) + 1;
       for (var p in home.players) {
-
         p.played = home.played!;
       }
       for (var p in away.players) {
@@ -94,31 +102,33 @@ class League extends HiveObject {
         away.points = (away.points ?? 0) + 1;
       }
     }
-    
   }
 
-  // Generate top scorers
+  // ─────────────────────────────────────────────────
+  //  Top Scorers
+  // ─────────────────────────────────────────────────
   void generateTopScorers() {
-
+    // Collect all players from all teams
     final allPlayers = teams.expand((team) => team.players).toList();
-
-    final scorers =
-        allPlayers.where((player) => (player.goals) > 0).toList();
-
-    scorers.sort((a, b) => b.goals.compareTo(a.goals as num));
-
+    // Keep only players with goals > 0
+    final scorers = allPlayers.where((player) => player.goals > 0).toList();
+    // Sort by goals descending
+    scorers.sort((a, b) => b.goals.compareTo(a.goals));
+    // Store in topScorers list
     topScorers = scorers.cast<Player>();
   }
 
-  // Generate top assistants
+  // ─────────────────────────────────────────────────
+  //  Top Assistants
+  // ─────────────────────────────────────────────────
   void generateTopAssistants() {
+    // Collect all players from all teams
     final allPlayers = teams.expand((team) => team.players).toList();
-
-    final assistants =
-        allPlayers.where((player) => player.assists > 0).toList();
-
-    assistants.sort((a, b) => b.assists.compareTo(a.assists as num));
-
+    // Keep only players with assists > 0
+    final assistants = allPlayers.where((p) => p.assists > 0).toList();
+    // Sort by assists descending
+    assistants.sort((a, b) => b.assists.compareTo(a.assists));
+    // Store in topAssistants list
     topAssistants = assistants.cast<Player>();
   }
 }

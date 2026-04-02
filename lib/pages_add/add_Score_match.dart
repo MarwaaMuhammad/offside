@@ -4,6 +4,10 @@ import 'package:offside/models/leage_model.dart';
 import 'package:offside/models/match_model.dart';
 import 'package:offside/models/player_model.dart';
 import 'package:offside/models/event_model.dart';
+// ── NEW ──────────────────────────────────────────────────────────────
+import 'package:offside/services/sync_service.dart';
+import 'package:offside/services/api_service.dart';
+// ─────────────────────────────────────────────────────────────────────
 
 class AddScorePage extends StatefulWidget {
   final int matchIndex;
@@ -29,11 +33,15 @@ class _AddScorePageState extends State<AddScorePage> {
     league = leaguesBox.getAt(widget.leagueIndex)!;
   }
 
-  void _addEvent(Match2 match, bool isHome, String type, Player player, {String? assist}) {
+  // ─────────────────────────────────────────────────────────────────
+  //  Record any event in the match
+  // ─────────────────────────────────────────────────────────────────
+  void _addEvent(Match2 match, bool isHome, String type, Player player,
+      {String? assist}) {
     final event = Event(
       type: type,
       player: player.name,
-      minute: DateTime.now().minute, // ممكن تعدلها عشان تدخل الدقيقة manually
+      minute: DateTime.now().minute, // You can modify this to allow manual minute input
       assist: assist,
     );
 
@@ -45,7 +53,56 @@ class _AddScorePageState extends State<AddScorePage> {
 
     league.save();
     setState(() {});
+  }
 
+  // ─────────────────────────────────────────────────────────────────
+  //  Finish match → save locally + sync to backend
+  // ─────────────────────────────────────────────────────────────────
+  Future<void> _finishMatch(Match2 match) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Finish Match?"),
+        content: Text(
+          "Final Score: ${match.homeTeamScore ?? 0} - ${match.awayTeamScore ?? 0}\n\nThis will push the result to the backend.",
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Cancel")),
+          ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("Finish & Sync")),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      // Sync the final result to the backend
+      await SyncService.syncMatchResult(match, league, isFinished: true);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("✅ Match result synced to backend!"),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("⚠️  Result saved locally but sync failed: ${e.message}"),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
   }
 
   void _showAssistDialog(Player scorer, Match2 match, bool isHome) {
@@ -93,7 +150,8 @@ class _AddScorePageState extends State<AddScorePage> {
                             p.appearances++;
                             league.save();
                           });
-                          _addEvent(match, isHome, "Goal", scorer, assist: p.name);
+                          _addEvent(match, isHome, "Goal", scorer,
+                              assist: p.name);
                           Navigator.pop(context);
                         },
                       ),
@@ -104,11 +162,9 @@ class _AddScorePageState extends State<AddScorePage> {
               const SizedBox(height: 10),
               Center(
                 child: TextButton.icon(
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.red,
-                  ),
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
                   onPressed: () {
-                    _addEvent(match, isHome, "Goal", scorer); // بدون Assist
+                    _addEvent(match, isHome, "Goal", scorer); // Without Assist
                     Navigator.pop(context);
                   },
                   icon: const Icon(Icons.close),
@@ -156,7 +212,7 @@ class _AddScorePageState extends State<AddScorePage> {
         }
       },
       {
-        "label": "Yellow Card",
+        "label": "Red Card",
         "icon": Icons.square,
         "color": Colors.red,
         "action": () {
@@ -219,44 +275,43 @@ class _AddScorePageState extends State<AddScorePage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       backgroundColor: Colors.grey[100],
-    builder: (context) {
-  return Container(
-    padding: const EdgeInsets.all(16),
-    height: MediaQuery.of(context).size.height * 0.5, // نصف الشاشة
-    child: GridView.count(
-      crossAxisCount: 3,
-      children: events.map((e) {
-        return GestureDetector(
-          onTap: () {
-            Navigator.pop(context);
-            (e["action"] as void Function())();
-          },
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircleAvatar(
-                radius: 28,
-                backgroundColor: e["color"] as Color? ?? Colors.grey,
-                child: Icon(
-                  e["icon"] as IconData,
-                  color: Colors.white,
-                  size: 28,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          height: MediaQuery.of(context).size.height * 0.5, // Half the screen
+          child: GridView.count(
+            crossAxisCount: 3,
+            children: events.map((e) {
+              return GestureDetector(
+                onTap: () {
+                  Navigator.pop(context);
+                  (e["action"] as void Function())();
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircleAvatar(
+                      radius: 28,
+                      backgroundColor: e["color"] as Color? ?? Colors.grey,
+                      child: Icon(
+                        e["icon"] as IconData,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      e["label"] as String,
+                      style: const TextStyle(fontSize: 13),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                e["label"] as String,
-                style: const TextStyle(fontSize: 13),
-                textAlign: TextAlign.center,
-              ),
-            ],
+              );
+            }).toList(),
           ),
         );
-      }).toList(),
-    ),
-  );
-}
-
+      },
     );
   }
 
@@ -265,9 +320,23 @@ class _AddScorePageState extends State<AddScorePage> {
     final match = league.matches[widget.matchIndex];
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Match Details")),
+      appBar: AppBar(
+        title: const Text("Match Details"),
+        actions: [
+          // ── NEW: Finish Match button ─────────────────────────────
+          TextButton.icon(
+            onPressed: () => _finishMatch(match),
+            icon: const Icon(Icons.check_circle, color: Colors.green),
+            label: const Text(
+              "Finish",
+              style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
       body: Column(
         children: [
+          // Match details header
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: Row(
@@ -282,7 +351,8 @@ class _AddScorePageState extends State<AddScorePage> {
                 const SizedBox(width: 20),
                 Text(
                   "${match.homeTeamScore ?? 0} : ${match.awayTeamScore ?? 0}",
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(width: 20),
                 Column(
@@ -296,6 +366,7 @@ class _AddScorePageState extends State<AddScorePage> {
           ),
           const Divider(thickness: 2),
 
+          // Players
           Expanded(
             child: Row(
               children: [
@@ -305,10 +376,12 @@ class _AddScorePageState extends State<AddScorePage> {
                       return Card(
                         child: ListTile(
                           title: Text(player.name),
-                          subtitle: Text("Goals: ${player.goals} | Assists: ${player.assists}"),
+                          subtitle: Text(
+                              "Goals: ${player.goals} | Assists: ${player.assists}"),
                           trailing: IconButton(
                             icon: const Icon(Icons.add_circle_outline),
-                            onPressed: () => _showEventDialog(player, match, true),
+                            onPressed: () =>
+                                _showEventDialog(player, match, true),
                           ),
                         ),
                       );
@@ -321,10 +394,12 @@ class _AddScorePageState extends State<AddScorePage> {
                       return Card(
                         child: ListTile(
                           title: Text(player.name),
-                          subtitle: Text("Goals: ${player.goals} | Assists: ${player.assists}"),
+                          subtitle: Text(
+                              "Goals: ${player.goals} | Assists: ${player.assists}"),
                           trailing: IconButton(
                             icon: const Icon(Icons.add_circle_outline),
-                            onPressed: () => _showEventDialog(player, match, false),
+                            onPressed: () =>
+                                _showEventDialog(player, match, false),
                           ),
                         ),
                       );
