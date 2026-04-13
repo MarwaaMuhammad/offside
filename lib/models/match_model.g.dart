@@ -25,13 +25,14 @@ class Match2Adapter extends TypeAdapter<Match2> {
       eventsHome: (fields[6] as List).cast<Event>(),
       eventsAway: (fields[7] as List).cast<Event>(),
       backendId: fields[8] as String?,
+      videoUrl: fields[9] as String?,
     )..status = fields[5] as String?;
   }
 
   @override
   void write(BinaryWriter writer, Match2 obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(10)
       ..writeByte(0)
       ..write(obj.homeTeam)
       ..writeByte(1)
@@ -49,7 +50,9 @@ class Match2Adapter extends TypeAdapter<Match2> {
       ..writeByte(7)
       ..write(obj.eventsAway)
       ..writeByte(8)
-      ..write(obj.backendId);
+      ..write(obj.backendId)
+      ..writeByte(9)
+      ..write(obj.videoUrl);
   }
 
   @override

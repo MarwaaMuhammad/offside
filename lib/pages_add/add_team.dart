@@ -6,33 +6,46 @@ import 'package:offside/pages_add/add_player.dart';
 class CreateTeamPage extends StatefulWidget {
   final String leagueName;
   final String logo;
+  final DateTime? startDate;
+  final DateTime? endDate;
 
-  const CreateTeamPage(
-      {super.key, required this.leagueName, required this.logo});
+  const CreateTeamPage({
+    super.key,
+    required this.leagueName,
+    required this.logo,
+    this.startDate,
+    this.endDate,
+  });
 
   @override
   State<CreateTeamPage> createState() => _CreateTeamPageState();
 }
 
 class _CreateTeamPageState extends State<CreateTeamPage> {
-  TextEditingController teamNameController = TextEditingController();
+  final TextEditingController teamNameController = TextEditingController();
+  final TextEditingController primaryColorController = TextEditingController();
+  final TextEditingController secondaryColorController = TextEditingController();
   List<Team> teams = [];
   int? selectedLogo;
 
-  List<String> teamLogos =
-      List.generate(20, (index) => "asset/Teams_Logo/${index + 1}.png");
+  final List<String> teamLogos = List.generate(20, (index) => "asset/Teams_Logo/${index + 1}.png");
 
   void addTeam() async {
     String teamName = teamNameController.text.trim();
     String? teamLogo = selectedLogo != null ? teamLogos[selectedLogo!] : null;
 
     if (teamName.isNotEmpty && teamLogo != null) {
-
       final newTeam = await Navigator.push<Team>(
         context,
         MaterialPageRoute(
           builder: (context) => CreatePlayersPage(
-            team: Team(name: teamName, logo: teamLogo, players: []),
+            team: Team(
+              name: teamName,
+              logo: teamLogo,
+              players: [],
+              primaryColor: primaryColorController.text,
+              secondaryColor: secondaryColorController.text,
+            ),
           ),
         ),
       );
@@ -42,26 +55,17 @@ class _CreateTeamPageState extends State<CreateTeamPage> {
           teams.add(newTeam);
         });
         teamNameController.clear();
+        primaryColorController.clear();
+        secondaryColorController.clear();
         selectedLogo = null;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("✅ Team '${newTeam.name}' added with players!")),
-        );
       }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("⚠️ Please enter a name and select a logo")),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("⚠️ Name and logo required")));
     }
   }
 
   void saveTeams() {
-    if (teams.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("⚠️ Please add at least one team")),
-      );
-      return;
-    }
-
+    if (teams.isEmpty) return;
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -69,6 +73,8 @@ class _CreateTeamPageState extends State<CreateTeamPage> {
           leagueLogo: widget.logo,
           leagueName: widget.leagueName,
           teams: teams,
+          startDate: widget.startDate,
+          endDate: widget.endDate,
         ),
       ),
     );
@@ -77,92 +83,72 @@ class _CreateTeamPageState extends State<CreateTeamPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.leagueName),
-        leading: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Image.asset(widget.logo),
-        ),
-      ),
+      backgroundColor: Colors.grey.shade100,
+      appBar: AppBar(title: Text("Add Teams to ${widget.leagueName}"), backgroundColor: Colors.grey.shade100,),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
-              controller: teamNameController,
-              decoration: InputDecoration(
-                labelText: "Team Name",
-                border: OutlineInputBorder(),
-              ),
+            TextField(controller: teamNameController, decoration: const InputDecoration(labelText: "Team Name", border: OutlineInputBorder())),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(child: TextField(controller: primaryColorController, decoration: const InputDecoration(labelText: "Primary Color (Hex)", border: OutlineInputBorder()))),
+                const SizedBox(width: 10),
+                Expanded(child: TextField(controller: secondaryColorController, decoration: const InputDecoration(labelText: "Secondary Color (Hex)", border: OutlineInputBorder()))),
+              ],
             ),
-            SizedBox(height: 20),
-
-            Text("Select Team Logo",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            SizedBox(height: 10),
-
+            const SizedBox(height: 20),
+            const Text("Select Team Logo", style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
             Wrap(
-              spacing: 12,
-              runSpacing: 12,
+              spacing: 8,
               children: List.generate(teamLogos.length, (index) {
                 return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      selectedLogo = index;
-                    });
-                  },
+                  onTap: () => setState(() => selectedLogo = index),
                   child: CircleAvatar(
-                    radius: 30,
-                    backgroundColor: selectedLogo == index
-                        ? Colors.blue.shade100
-                        : Colors.grey.shade200,
-                    child: Padding(
-                      padding: const EdgeInsets.all(6.0),
-                      child: Image.asset(teamLogos[index]),
-                    ),
+                    radius: 25,
+                    backgroundColor: selectedLogo == index ? Colors.blue : Colors.grey[200],
+                    child: Padding(padding: const EdgeInsets.all(4), child: Image.asset(teamLogos[index])),
                   ),
                 );
               }),
             ),
-
-            SizedBox(height: 30),
-
+            const SizedBox(height: 30),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                ElevatedButton.icon(
-                  onPressed: addTeam,
-                  icon: Icon(Icons.add),
-                  label: Text("Add Team + Players"),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: addTeam,
+                    icon: const Icon(Icons.person_add, color: Colors.white),
+                    label: const Text("Add Teams", style: TextStyle(color: Colors.white)),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.blue[900]),
+                  ),
                 ),
-                ElevatedButton.icon(
-                  onPressed: saveTeams,
-                  icon: Icon(Icons.save),
-                  label: Text("Save Teams"),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: saveTeams,
+                    icon: const Icon(Icons.arrow_forward, color: Colors.white),
+                    label: const Text("Finalize League", style: TextStyle(color: Colors.white)),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.blue[900]),
+                  ),
                 ),
               ],
             ),
-
-            SizedBox(height: 20),
-
-            Text("Teams Added",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            SizedBox(height: 10),
-
+            const SizedBox(height: 20),
             ListView.builder(
               shrinkWrap: true,
-              physics: NeverScrollableScrollPhysics(),
+              physics: const NeverScrollableScrollPhysics(),
               itemCount: teams.length,
-              itemBuilder: (context, index) {
-                return Card(
-                  child: ListTile(
-                    leading: Image.asset(teams[index].logo, width: 40),
-                    title: Text(teams[index].name),
-                    subtitle: Text("Players: ${teams[index].players.length}"),
-                  ),
-                );
-              },
+              itemBuilder: (context, index) => Card(
+                child: ListTile(
+                  leading: Image.asset(teams[index].logo, width: 40),
+                  title: Text(teams[index].name),
+                  subtitle: Text("Players: ${teams[index].players.length}"),
+                ),
+              ),
             ),
           ],
         ),

@@ -5,21 +5,22 @@ import 'package:offside/models/match_model.dart';
 import 'package:offside/models/team_model.dart';
 import 'package:intl/intl.dart';
 import 'package:offside/pages_details/details_league.dart';
-// ── NEW ──────────────────────────────────────────────────────────────
 import 'package:offside/services/sync_service.dart';
-import 'package:offside/services/api_service.dart';
-// ─────────────────────────────────────────────────────────────────────
 
 class CreateMatchPage extends StatefulWidget {
   final List<Team> teams;
   final String leagueLogo;
   final String leagueName;
+  final DateTime? startDate;
+  final DateTime? endDate;
 
   const CreateMatchPage({
     super.key,
     required this.teams,
     required this.leagueLogo,
     required this.leagueName,
+    this.startDate,
+    this.endDate,
   });
 
   @override
@@ -28,7 +29,7 @@ class CreateMatchPage extends StatefulWidget {
 
 class _CreateMatchPageState extends State<CreateMatchPage> {
   List<Match2> matches = [];
-  bool _isSyncing = false; // shows loading indicator during backend sync
+  bool _isSyncing = false;
 
   void createMatch() {
     setState(() {
@@ -40,7 +41,7 @@ class _CreateMatchPageState extends State<CreateMatchPage> {
           matches.add(Match2(
             homeTeam: shuffledTeams[i],
             awayTeam: shuffledTeams[j],
-            date: DateTime.now(),
+            date: widget.startDate ?? DateTime.now(),
           ));
         }
       }
@@ -48,94 +49,63 @@ class _CreateMatchPageState extends State<CreateMatchPage> {
   }
 
   Future<void> pickDateTime(int index) async {
-    // Pick date
     DateTime? pickedDate = await showDatePicker(
       context: context,
       initialDate: matches[index].date,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
+      firstDate: widget.startDate ?? DateTime(2020),
+      lastDate: widget.endDate ?? DateTime(2100),
     );
-    if (pickedDate == null) return;
+    if (pickedDate == null || !mounted) return;
 
-    // Pick time
     TimeOfDay? pickedTime = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(matches[index].date),
     );
-    if (pickedTime == null) return;
-
-    // Merge date with time
-    final newDateTime = DateTime(
-      pickedDate.year,
-      pickedDate.month,
-      pickedDate.day,
-      pickedTime.hour,
-      pickedTime.minute,
-    );
+    if (pickedTime == null || !mounted) return;
 
     setState(() {
       matches[index] = Match2(
         homeTeam: matches[index].homeTeam,
         awayTeam: matches[index].awayTeam,
-        date: newDateTime,
+        date: DateTime(pickedDate.year, pickedDate.month, pickedDate.day, pickedTime.hour, pickedTime.minute),
       );
     });
   }
 
-  // ── UPDATED saveMatches: saves locally THEN syncs to backend ──────
   Future<void> saveMatches() async {
     setState(() => _isSyncing = true);
-
     try {
-      // 1. Save locally to Hive first (always works offline)
       final leagueBox = await Hive.openBox<League>('leagues');
       final league = League(
         logo: widget.leagueLogo,
         name: widget.leagueName,
         teams: widget.teams,
         matches: matches,
+        startDate: widget.startDate,
+        endDate: widget.endDate,
       );
       await leagueBox.add(league);
-      await leagueBox.flush(); // Ensure immediate save
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("✅ League '${widget.leagueName}' saved locally!")),
-      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("✅ League saved locally!")));
 
-      // 2. Now sync to backend
+      // Syncing everything to backend based on the ER Diagram
       await SyncService.syncLeagueToBackend(league);
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("☁️  League synced to backend!"),
-          backgroundColor: Colors.green,
-        ),
+        const SnackBar(content: Text("🚀 Full sync to backend successful!"), backgroundColor: Colors.green),
       );
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => LeaguePage(league: league)),
-      );
-    } on ApiException catch (e) {
-      // Backend failed but local save succeeded — still navigate
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("⚠️  Saved locally but backend sync failed: ${e.message}"),
-          backgroundColor: Colors.orange,
-          duration: const Duration(seconds: 5),
-        ),
-      );
-
-      final leagueBox = Hive.box<League>('leagues');
-      final league = leagueBox.values.last;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => LeaguePage(league: league)),
-      );
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => LeaguePage(league: league)));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("❌ Error: $e")),
-      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("❌ Sync Error: $e"), backgroundColor: Colors.red));
+      // Still navigate if it's just a backend error, as it's saved locally
+      final leagueBox = Hive.box<League>('leagues');
+      if (leagueBox.isNotEmpty) {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => LeaguePage(league: leagueBox.values.last)));
+      }
     } finally {
       if (mounted) setState(() => _isSyncing = false);
     }
@@ -144,91 +114,49 @@ class _CreateMatchPageState extends State<CreateMatchPage> {
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('yyyy-MM-dd – HH:mm');
-
     return Scaffold(
       appBar: AppBar(
-        title: Text("Create Matches - ${widget.leagueName}"),
+        title: Text(widget.leagueName),
         actions: [
-          _isSyncing
-              ? const Padding(
-                  padding: EdgeInsets.all(12),
-                  child: SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                )
-              : IconButton(
-                  icon: const Icon(Icons.save, color: Colors.black),
-                  onPressed: matches.isEmpty ? null : saveMatches,
-                ),
+          if (_isSyncing)
+            const Center(child: Padding(padding: EdgeInsets.all(16.0), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))))
+          else
+            IconButton(icon: const Icon(Icons.cloud_upload), onPressed: matches.isEmpty ? null : saveMatches),
         ],
       ),
       body: Column(
         children: [
+          if (widget.startDate != null)
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text("Tournament Duration: ${DateFormat('MMM dd').format(widget.startDate!)} - ${DateFormat('MMM dd, yyyy').format(widget.endDate!)}", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+            ),
           Expanded(
             child: matches.isEmpty
-                ? const Center(
-                    child: Text("⚽ No matches yet. Click below to create."),
-                  )
+                ? const Center(child: Text("⚽ Tap 'Create Matches' to generate the schedule"))
                 : ListView.builder(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(10),
                     itemCount: matches.length,
                     itemBuilder: (context, index) {
-                      final match = matches[index];
+                      final m = matches[index];
                       return Card(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        margin: const EdgeInsets.symmetric(vertical: 6),
-                        elevation: 4,
                         child: ListTile(
-                          leading: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              CircleAvatar(
-                                backgroundImage:
-                                    AssetImage(match.homeTeam.logo),
-                                radius: 18,
-                              ),
-                              const SizedBox(width: 5),
-                              CircleAvatar(
-                                backgroundImage:
-                                    AssetImage(match.awayTeam.logo),
-                                radius: 18,
-                              ),
-                            ],
-                          ),
-                          title: Text(
-                            "${match.homeTeam.name} 🆚 ${match.awayTeam.name}",
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text(
-                            "📅 ${dateFormat.format(match.date)}",
-                            style: const TextStyle(color: Colors.grey),
-                          ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.edit_calendar,
-                                color: Colors.blueAccent),
-                            onPressed: () => pickDateTime(index),
-                          ),
+                          leading: Image.asset(m.homeTeam.logo, width: 30),
+                          title: Text("${m.homeTeam.name} vs ${m.awayTeam.name}", style: const TextStyle(fontWeight: FontWeight.w600)),
+                          subtitle: Text(dateFormat.format(m.date)),
+                          trailing: IconButton(icon: const Icon(Icons.event, color: Colors.blue), onPressed: () => pickDateTime(index)),
                         ),
                       );
                     },
                   ),
           ),
           Padding(
-            padding: const EdgeInsets.all(12.0),
+            padding: const EdgeInsets.all(16.0),
             child: ElevatedButton.icon(
               onPressed: createMatch,
-              icon: const Icon(Icons.add),
-              label: const Text("Create Matches"),
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 50),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text("Generate Round Robin Schedule"),
+              style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50), backgroundColor: Colors.indigo, foregroundColor: Colors.white),
             ),
           ),
         ],

@@ -29,13 +29,15 @@ class TeamAdapter extends TypeAdapter<Team> {
       played: fields[9] as int?,
       diff_goals: fields[10] as int?,
       backendId: fields[11] as String?,
+      primaryColor: fields[12] as String?,
+      secondaryColor: fields[13] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Team obj) {
     writer
-      ..writeByte(12)
+      ..writeByte(14)
       ..writeByte(0)
       ..write(obj.name)
       ..writeByte(1)
@@ -59,7 +61,11 @@ class TeamAdapter extends TypeAdapter<Team> {
       ..writeByte(10)
       ..write(obj.diff_goals)
       ..writeByte(11)
-      ..write(obj.backendId);
+      ..write(obj.backendId)
+      ..writeByte(12)
+      ..write(obj.primaryColor)
+      ..writeByte(13)
+      ..write(obj.secondaryColor);
   }
 
   @override

@@ -34,6 +34,10 @@ class Match2 extends HiveObject {
   @HiveField(8)
   String? backendId;
 
+  // New fields from ER diagram
+  @HiveField(9)
+  String? videoUrl;
+
   Match2({
     required this.homeTeam,
     required this.awayTeam,
@@ -43,5 +47,6 @@ class Match2 extends HiveObject {
     this.eventsHome = const [],
     this.eventsAway = const [],
     this.backendId,
+    this.videoUrl,
   });
 }

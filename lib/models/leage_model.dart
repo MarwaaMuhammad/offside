@@ -30,6 +30,13 @@ class League extends HiveObject {
   @HiveField(6)
   String? backendId;
 
+  // New fields from ER diagram
+  @HiveField(7)
+  DateTime? startDate;
+
+  @HiveField(8)
+  DateTime? endDate;
+
   League({
     required this.logo,
     required this.name,
@@ -38,6 +45,8 @@ class League extends HiveObject {
     this.topScorers,
     this.topAssistants,
     this.backendId,
+    this.startDate,
+    this.endDate,
   });
 
   // ─────────────────────────────────────────────────

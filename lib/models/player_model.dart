@@ -49,6 +49,22 @@ class Player extends HiveObject {
   @HiveField(14)
   int played;
 
+  // New fields from ER diagram
+  @HiveField(15)
+  double? height;
+
+  @HiveField(16)
+  double? weight;
+
+  @HiveField(17)
+  double? highestSpeed;
+
+  @HiveField(18)
+  double? totalDistance;
+
+  @HiveField(19)
+  String? backendId;
+
   Player({
     required this.name,
     required this.position,
@@ -65,6 +81,10 @@ class Player extends HiveObject {
     this.shots = 0,
     this.passes = 0,
     this.played = 0,
+    this.height,
+    this.weight,
+    this.highestSpeed,
+    this.totalDistance,
+    this.backendId,
   });
-  
 }

@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:offside/models/leage_model.dart';
+import 'package:offside/models/match_model.dart';
 import 'package:offside/pages_details/details_league.dart';
 import 'package:offside/pages_add/add_Score_match.dart';
 
@@ -14,7 +15,6 @@ class MatchesPage extends StatefulWidget {
 }
 
 class _MatchesPageState extends State<MatchesPage> {
-  final Color matchCardColor = const Color(0xFF0D1956);
   final Color leagueColor = const Color(0xFF16246E);
 
   DateTime selectedDate = DateTime.now();
@@ -37,22 +37,17 @@ class _MatchesPageState extends State<MatchesPage> {
         elevation: 0,
         leadingWidth: 80,
         leading: Padding(
-          padding: const EdgeInsets.all(0),
+          padding: const EdgeInsets.all(8.0),
           child: Image.asset('asset/logo2.png', fit: BoxFit.contain),
         ),
         actions: [
-          IconButton(
-            onPressed: () {},
-            icon: SvgPicture.asset('asset/icons/filter.svg', width: 22),
-          ),
           IconButton(
             onPressed: () {
               setState(() {
                 selectedDate = selectedDate.subtract(const Duration(days: 1));
               });
             },
-            icon: const Icon(Icons.arrow_back_ios_new,
-                size: 20, color: Colors.black87),
+            icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: Colors.black87),
           ),
           IconButton(
             onPressed: () async {
@@ -62,13 +57,9 @@ class _MatchesPageState extends State<MatchesPage> {
                 firstDate: DateTime(2020),
                 lastDate: DateTime(2030),
               );
-              if (picked != null) {
-                setState(() {
-                  selectedDate = picked;
-                });
-              }
+              if (picked != null) setState(() => selectedDate = picked);
             },
-            icon: SvgPicture.asset("asset/icons/date.svg", width: 22),
+            icon: const Icon(Icons.calendar_month, color: Colors.black87),
           ),
           IconButton(
             onPressed: () {
@@ -76,8 +67,7 @@ class _MatchesPageState extends State<MatchesPage> {
                 selectedDate = selectedDate.add(const Duration(days: 1));
               });
             },
-            icon: const Icon(Icons.arrow_forward_ios,
-                size: 20, color: Colors.black87),
+            icon: const Icon(Icons.arrow_forward_ios, size: 20, color: Colors.black87),
           ),
         ],
       ),
@@ -86,233 +76,96 @@ class _MatchesPageState extends State<MatchesPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Search bar
             TextField(
               onChanged: (value) => setState(() => searchQuery = value),
               decoration: InputDecoration(
-                hintText: "Search team...",
+                hintText: "Search team or league...",
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
                 fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16),
               ),
             ),
-
             const SizedBox(height: 14),
-
-            Text(
-              formatDate(selectedDate),
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            if (searchQuery.isEmpty)
+              Text(formatDate(selectedDate), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-
             Expanded(
               child: ValueListenableBuilder<Box<League>>(
                 valueListenable: Hive.box<League>('leagues').listenable(),
                 builder: (context, box, _) {
-                  if (box.values.isEmpty) {
-                    return const Center(
-                      child: Text(
-                        "No leagues saved yet",
-                        style: TextStyle(color: Colors.black54, fontSize: 16),
-                      ),
-                    );
+                  final allLeagues = box.values.toList();
+                  if (allLeagues.isEmpty) {
+                    return const Center(child: Text("No leagues or matches found"));
                   }
 
-                  final leagues = box.values.toList();
-
                   return ListView.builder(
-                    itemCount: leagues.length,
-                    itemBuilder: (context, index) {
-                      final league = leagues[index];
-
-                      var matchesForDay = league.matches
-                          .where((m) => isSameDay(m.date, selectedDate))
-                          .toList();
-
+                    itemCount: allLeagues.length,
+                    itemBuilder: (context, lIdx) {
+                      final league = allLeagues[lIdx];
+                      
+                      // Filter matches: if searching, ignore date. If not searching, filter by selectedDate.
+                      List<Match2> displayMatches;
                       if (searchQuery.isNotEmpty) {
-                        matchesForDay = matchesForDay.where((m) {
-                          return m.homeTeam.name
-                                  .toLowerCase()
-                                  .contains(searchQuery.toLowerCase()) ||
-                              m.awayTeam.name
-                                  .toLowerCase()
-                                  .contains(searchQuery.toLowerCase());
-                        }).toList();
+                        displayMatches = league.matches.where((m) =>
+                          m.homeTeam.name.toLowerCase().contains(searchQuery.toLowerCase()) ||
+                          m.awayTeam.name.toLowerCase().contains(searchQuery.toLowerCase()) ||
+                          league.name.toLowerCase().contains(searchQuery.toLowerCase())
+                        ).toList();
+                      } else {
+                        displayMatches = league.matches.where((m) => isSameDay(m.date, selectedDate)).toList();
                       }
 
-                      if (matchesForDay.isEmpty) return const SizedBox();
+                      if (displayMatches.isEmpty) return const SizedBox.shrink();
 
-                      return GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => LeaguePage(league: league),
-                            ),
-                          );
-                        },
-                        child: Card(
-                          elevation: 3,
-                          shape: RoundedRectangleBorder(
+                      return Card(
+                        elevation: 3,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        margin: const EdgeInsets.only(bottom: 16),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(colors: [leagueColor, leagueColor.withOpacity(0.85)]),
                             borderRadius: BorderRadius.circular(14),
                           ),
-                          margin: const EdgeInsets.only(bottom: 16),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  leagueColor,
-                                  leagueColor.withOpacity(0.85),
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Image.asset(league.logo, width: 32, height: 32),
+                                  const SizedBox(width: 10),
+                                  Text(league.name, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
                                 ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
                               ),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Image.asset(league.logo,
-                                        width: 32, height: 32),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      league.name,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    PopupMenuButton<String>(
-                                      color: Colors.white,
-                                      onSelected: (value) {},
-                                      itemBuilder: (_) => [
-                                        const PopupMenuItem(
-                                            value: "top",
-                                            child: Text("Move to the Top")),
-                                        const PopupMenuItem(
-                                          value: "hide",
+                              const Divider(color: Colors.white30),
+                              ...displayMatches.map((match) {
+                                final matchIdx = league.matches.indexOf(match);
+                                return GestureDetector(
+                                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddScorePage(matchIndex: matchIdx, leagueIndex: lIdx))),
+                                  child: Container(
+                                    margin: const EdgeInsets.symmetric(vertical: 4),
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(12)),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(child: Row(children: [Image.asset(match.homeTeam.logo, width: 24), const SizedBox(width: 8), Flexible(child: Text(match.homeTeam.name, style: const TextStyle(color: Colors.white, fontSize: 14), overflow: TextOverflow.ellipsis))])),
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8),
                                           child: Text(
-                                            "Hide Championship",
-                                            style: TextStyle(color: Colors.red),
+                                            match.homeTeamScore == null ? DateFormat('HH:mm').format(match.date) : "${match.homeTeamScore} - ${match.awayTeamScore}",
+                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                                           ),
                                         ),
-                                        const PopupMenuItem(
-                                            value: "bottom",
-                                            child: Text("Move to the Bottom")),
+                                        Expanded(child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [Flexible(child: Text(match.awayTeam.name, style: const TextStyle(color: Colors.white, fontSize: 14), overflow: TextOverflow.ellipsis)), const SizedBox(width: 8), Image.asset(match.awayTeam.logo, width: 24)])),
                                       ],
-                                      icon: const Icon(Icons.more_vert,
-                                          color: Colors.white),
                                     ),
-                                  ],
-                                ),
-                                const Divider(color: Colors.white30),
-                                Column(
-                                  children: matchesForDay.map((match) {
-                                    final now = DateTime.now();
-                                    final isUpcoming = now.isBefore(match.date);
-                                    final isLive = now.isAfter(match.date) &&
-                                        now.isBefore(match.date
-                                            .add(const Duration(minutes: 30)));
-
-                                    String statusText;
-                                    Color statusColor = Colors.white;
-                                    if (isUpcoming) {
-                                      statusText = DateFormat('HH:mm')
-                                          .format(match.date);
-                                    } else if (isLive) {
-                                      statusText =
-                                          "LIVE   ${match.homeTeamScore} - ${match.awayTeamScore}";
-                                      statusColor = Colors.redAccent;
-                                    } else {
-                                      if (match.homeTeamScore == null &&
-                                          match.awayTeamScore == null) {
-                                        match.homeTeamScore = 0;
-                                        match.awayTeamScore = 0;
-                                      }
-                                      statusText =
-                                          "${match.homeTeamScore} - ${match.awayTeamScore}";
-                                    }
-
-                                    return GestureDetector(
-                                      onTap: () {
-                                        final matchIndex =
-                                            league.matches.indexOf(match);
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => AddScorePage(
-                                              matchIndex: matchIndex,
-                                              leagueIndex: index,
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                      child: Container(
-                                        margin: const EdgeInsets.symmetric(
-                                            vertical: 8),
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 10),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white10,
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                        ),
-                                        child: Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Image.asset(match.homeTeam.logo,
-                                                    width: 32, height: 32),
-                                                const SizedBox(width: 8),
-                                                Text(
-                                                  match.homeTeam.name,
-                                                  style: const TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 15),
-                                                ),
-                                              ],
-                                            ),
-                                            Text(
-                                              statusText,
-                                              style: TextStyle(
-                                                color: statusColor,
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                            Row(
-                                              children: [
-                                                Text(
-                                                  match.awayTeam.name,
-                                                  style: const TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 15),
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Image.asset(match.awayTeam.logo,
-                                                    width: 32, height: 32),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  }).toList(),
-                                )
-                              ],
-                            ),
+                                  ),
+                                );
+                              }).toList(),
+                            ],
                           ),
                         ),
                       );

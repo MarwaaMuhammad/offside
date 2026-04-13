@@ -32,13 +32,18 @@ class PlayerAdapter extends TypeAdapter<Player> {
       shots: fields[12] as int,
       passes: fields[13] as int,
       played: fields[14] as int,
+      height: fields[15] as double?,
+      weight: fields[16] as double?,
+      highestSpeed: fields[17] as double?,
+      totalDistance: fields[18] as double?,
+      backendId: fields[19] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Player obj) {
     writer
-      ..writeByte(15)
+      ..writeByte(20)
       ..writeByte(0)
       ..write(obj.name)
       ..writeByte(1)
@@ -68,7 +73,17 @@ class PlayerAdapter extends TypeAdapter<Player> {
       ..writeByte(13)
       ..write(obj.passes)
       ..writeByte(14)
-      ..write(obj.played);
+      ..write(obj.played)
+      ..writeByte(15)
+      ..write(obj.height)
+      ..writeByte(16)
+      ..write(obj.weight)
+      ..writeByte(17)
+      ..write(obj.highestSpeed)
+      ..writeByte(18)
+      ..write(obj.totalDistance)
+      ..writeByte(19)
+      ..write(obj.backendId);
   }
 
   @override

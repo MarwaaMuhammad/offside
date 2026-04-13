@@ -38,9 +38,14 @@ class Team extends HiveObject {
   @HiveField(10)
   int? diff_goals;
 
-  /// The backend UUID for this team. Set after syncing to the server.
   @HiveField(11)
   String? backendId;
+
+  @HiveField(12)
+  String? primaryColor;
+
+  @HiveField(13)
+  String? secondaryColor;
 
   Team({
     required this.name,
@@ -55,5 +60,7 @@ class Team extends HiveObject {
     this.played = 0,
     this.diff_goals = 0,
     this.backendId,
+    this.primaryColor,
+    this.secondaryColor,
   });
 }
