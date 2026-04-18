@@ -8,23 +8,37 @@ import 'package:offside/models/team_model.dart';
 import 'package:offside/models/match_stats_model.dart';
 import 'package:offside/models/player_stats_model.dart';
 import 'package:offside/models/team_stats_model.dart';
+import 'package:offside/models/invitation_model.dart';
 import 'package:offside/splash_screen.dart';
+import 'package:offside/theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
 
-  // Registering Adapters with Unique Type IDs
-  Hive.registerAdapter(LeagueAdapter());      // ID: 0
-  Hive.registerAdapter(Match2Adapter());      // ID: 1
-  Hive.registerAdapter(TeamAdapter());        // ID: 2
-  Hive.registerAdapter(PlayerAdapter());      // ID: 3
-  Hive.registerAdapter(EventAdapter());       // ID: 4
-  // Hive.registerAdapter(MatchStatsAdapter());  // ID: 5
-  // Hive.registerAdapter(PlayerStatsAdapter()); // ID: 6
-  // Hive.registerAdapter(TeamStatsAdapter());   // ID: 7
-  //
+  // Registering Adapters
+  Hive.registerAdapter(LeagueAdapter());      
+  Hive.registerAdapter(Match2Adapter());      
+  Hive.registerAdapter(TeamAdapter());        
+  Hive.registerAdapter(PlayerAdapter());      
+  Hive.registerAdapter(EventAdapter());       
+  
+  // Register these if they have been generated
+  try {
+    Hive.registerAdapter(MatchStatsAdapter());  
+    Hive.registerAdapter(PlayerStatsAdapter()); 
+    Hive.registerAdapter(TeamStatsAdapter());   
+    // Hive.registerAdapter(InvitationAdapter()); // Uncomment after running build_runner
+  } catch (_) {}
+  
   await Hive.openBox<League>('leagues');
+  // Opening the invitations box safely
+  try {
+     await Hive.openBox<Invitation>('invitations');
+  } catch (_) {
+     // If Invitation model isn't generated yet, open as a generic box to avoid crash
+     await Hive.openBox('invitations');
+  }
 
   runApp(const MyApp());
 }
@@ -34,11 +48,18 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Offside',
-      theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
-      home: const SplashScreen(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeProvider.themeMode,
+      builder: (context, mode, child) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'Offside',
+          theme: ThemeProvider.lightTheme,
+          darkTheme: ThemeProvider.darkTheme,
+          themeMode: mode,
+          home: const SplashScreen(),
+        );
+      },
     );
   }
 }

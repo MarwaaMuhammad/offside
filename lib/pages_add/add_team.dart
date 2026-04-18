@@ -46,6 +46,7 @@ class _CreateTeamPageState extends State<CreateTeamPage> {
               primaryColor: primaryColorController.text,
               secondaryColor: secondaryColorController.text,
             ),
+            leagueName: widget.leagueName, // Pass leagueName for invitations
           ),
         ),
       );
@@ -65,7 +66,10 @@ class _CreateTeamPageState extends State<CreateTeamPage> {
   }
 
   void saveTeams() {
-    if (teams.isEmpty) return;
+    if (teams.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("⚠️ Please add at least one team")));
+      return;
+    }
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -122,7 +126,7 @@ class _CreateTeamPageState extends State<CreateTeamPage> {
                   child: ElevatedButton.icon(
                     onPressed: addTeam,
                     icon: const Icon(Icons.person_add, color: Colors.white),
-                    label: const Text("Add Teams", style: TextStyle(color: Colors.white)),
+                    label: const Text("Invite Players", style: TextStyle(color: Colors.white)),
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.blue[900]),
                   ),
                 ),
@@ -138,6 +142,8 @@ class _CreateTeamPageState extends State<CreateTeamPage> {
               ],
             ),
             const SizedBox(height: 20),
+            const Text("Teams in this League:", style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -147,6 +153,10 @@ class _CreateTeamPageState extends State<CreateTeamPage> {
                   leading: Image.asset(teams[index].logo, width: 40),
                   title: Text(teams[index].name),
                   subtitle: Text("Players: ${teams[index].players.length}"),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () => setState(() => teams.removeAt(index)),
+                  ),
                 ),
               ),
             ),
