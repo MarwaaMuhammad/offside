@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/adapters.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:offside/models/event_model.dart';
 import 'package:offside/models/leage_model.dart';
 import 'package:offside/models/match_model.dart';
@@ -12,8 +13,15 @@ import 'package:offside/models/invitation_model.dart';
 import 'package:offside/splash_screen.dart';
 import 'package:offside/theme_provider.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // 🚀 Initialize Supabase
+  await Supabase.initialize(
+    url: 'https://gsvowvzdxphlguclawur.supabase.co',
+    anonKey: 'sb_publishable_vuHhBKjf4kJJgPnkFlNm9A_ErI2gVd_', 
+  );
+
   await Hive.initFlutter();
 
   // Registering Adapters
@@ -23,20 +31,17 @@ void main() async {
   Hive.registerAdapter(PlayerAdapter());      
   Hive.registerAdapter(EventAdapter());       
   
-  // Register these if they have been generated
   try {
     Hive.registerAdapter(MatchStatsAdapter());  
     Hive.registerAdapter(PlayerStatsAdapter()); 
     Hive.registerAdapter(TeamStatsAdapter());   
-    // Hive.registerAdapter(InvitationAdapter()); // Uncomment after running build_runner
+    // Hive.registerAdapter(InvitationAdapter()); 
   } catch (_) {}
   
   await Hive.openBox<League>('leagues');
-  // Opening the invitations box safely
   try {
      await Hive.openBox<Invitation>('invitations');
   } catch (_) {
-     // If Invitation model isn't generated yet, open as a generic box to avoid crash
      await Hive.openBox('invitations');
   }
 

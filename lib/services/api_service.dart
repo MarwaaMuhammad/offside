@@ -1,253 +1,123 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Central class for all communication with the Offside backend.
 class ApiService {
-  static const String baseUrl =
-      'https://offside-graduation-project-production.up.railway.app';
+  static const String baseUrl = 'https://gsvowvzdxphlguclawur.supabase.co/rest/v1';
+  static const String supabaseAnonKey = "sb_publishable_vuHhBKjf4kJJgPnkFlNm9A_ErI2gVd_"; 
 
-  static Uri _uri(String path, [Map<String, String>? query]) =>
-      Uri.parse('$baseUrl$path').replace(queryParameters: query);
+  static Uri _uri(String path) {
+    String cleanPath = path.startsWith('/') ? path : '/$path';
+    if (cleanPath.endsWith('/')) {
+      cleanPath = cleanPath.substring(0, cleanPath.length - 1);
+    }
+    return Uri.parse('$baseUrl$cleanPath');
+  }
 
   static Map<String, String> get _headers => {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'apikey': supabaseAnonKey,
+    'Authorization': 'Bearer $supabaseAnonKey',
+    'Prefer': 'return=representation',
+  };
 
   static dynamic _handleResponse(http.Response res) {
+    print("📡 [API Response] ${res.statusCode} | ${res.body}");
     if (res.statusCode >= 200 && res.statusCode < 300) {
       if (res.body.isEmpty) return null;
-      return jsonDecode(res.body);
+      final decoded = jsonDecode(res.body);
+      if (decoded is List && decoded.isNotEmpty) return decoded.first;
+      return decoded;
     } else {
-      throw ApiException(
-        statusCode: res.statusCode,
-        message: _extractErrorMessage(res.body),
-      );
+      throw ApiException(statusCode: res.statusCode, message: res.body);
     }
   }
 
-  static String _extractErrorMessage(String body) {
-    try {
-      final decoded = jsonDecode(body);
-      return decoded['detail'] ?? decoded['message'] ?? body;
-    } catch (_) {
-      return body;
-    }
+  // 🔹 FETCH Methods
+  static Future<List<dynamic>> getAllPlayers() async {
+    final res = await http.get(_uri('PLAYERS'), headers: _headers);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw ApiException(statusCode: res.statusCode, message: res.body);
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  //  TOURNAMENTS
-  // ═══════════════════════════════════════════════════════════════
-
-  static Future<Map<String, dynamic>> createTournament({
-    required String name,
-    DateTime? startDate,
-    DateTime? endDate,
-  }) async {
-    final body = {
-      'tournament_name': name,
-      if (startDate != null) 'start_date': startDate.toIso8601String(),
-      if (endDate != null) 'end_date': endDate.toIso8601String(),
-    };
-    final res = await http.post(_uri('/tournaments'), headers: _headers, body: jsonEncode(body));
-    return _handleResponse(res);
-  }
-
-  static Future<List<dynamic>> getTournaments() async {
-    final res = await http.get(_uri('/tournaments'), headers: _headers);
-    return _handleResponse(res);
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  //  TEAMS
-  // ═══════════════════════════════════════════════════════════════
-
-  static Future<Map<String, dynamic>> createTeam({
-    required String name,
-    String? primaryColor,
-    String? secondaryColor,
-    List<String>? playerNames,
-  }) async {
-    final body = {
-      'team_name': name,
-      if (primaryColor != null) 'primary_tshirt_color': primaryColor,
-      if (secondaryColor != null) 'secondary_tshirt_color': secondaryColor,
-      if (playerNames != null) 'player_names_list': playerNames,
-    };
-    final res = await http.post(_uri('/teams'), headers: _headers, body: jsonEncode(body));
-    return _handleResponse(res);
-  }
-
-  static Future<List<dynamic>> getTeams() async {
-    final res = await http.get(_uri('/teams'), headers: _headers);
-    return _handleResponse(res);
-  }
-
-  static Future<Map<String, dynamic>> getTeamById(String teamId) async {
-    final res = await http.get(_uri('/teams/$teamId'), headers: _headers);
-    return _handleResponse(res);
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  //  PLAYERS
-  // ═══════════════════════════════════════════════════════════════
-
-  static Future<Map<String, dynamic>> createPlayer({
-    required String teamId,
-    required String fullName,
-    required int jerseyNumber,
-    required String nationality,
-    required double height,
-    required double weight,
-    required String position,
-    double highestSpeed = 0.0,
-    double totalDestination = 0.0,
-  }) async {
-    final body = {
-      'team_id': teamId,
-      'full_name': fullName,
-      'jersey_number': jerseyNumber,
-      'nationality': nationality,
-      'height': height,
-      'weight': weight,
-      'position': position,
-      'highest_speed': highestSpeed,
-      'total_destination': totalDestination,
-    };
-    final res = await http.post(_uri('/players'), headers: _headers, body: jsonEncode(body));
-    return _handleResponse(res);
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  //  MATCHES
-  // ═══════════════════════════════════════════════════════════════
-
-  static Future<Map<String, dynamic>> createMatch({
-    required String tournamentId,
-    required DateTime matchDate,
-    String? videoUrl,
-  }) async {
-    final body = {
-      'tournament_id': tournamentId,
-      'match_date': matchDate.toIso8601String(),
-      if (videoUrl != null) 'video_url': videoUrl,
-    };
-    final res = await http.post(_uri('/matches'), headers: _headers, body: jsonEncode(body));
-    return _handleResponse(res);
-  }
-
-  static Future<Map<String, dynamic>> updateMatch(
-    String matchId, {
-    int? scoreTeamA,
-    int? scoreTeamB,
-    String? status,
-    String? winnerId,
-    DateTime? endTime,
-  }) async {
-    final body = <String, dynamic>{
-      if (scoreTeamA != null) 'score_teamA': scoreTeamA,
-      if (scoreTeamB != null) 'score_teamB': scoreTeamB,
-      if (status != null) 'status': status,
-      if (winnerId != null) 'winner_team_id': winnerId,
-      if (endTime != null) 'end_time': endTime.toIso8601String(),
-    };
-    final res = await http.patch(
-      _uri('/matches/$matchId'),
-      headers: _headers,
-      body: jsonEncode(body),
-    );
-    return _handleResponse(res);
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  //  STATS
-  // ═══════════════════════════════════════════════════════════════
-
-  static Future<Map<String, dynamic>> submitMatchStats({
-    required String matchId,
-    required String teamId,
-    int passesCount = 0,
-    int goalCount = 0,
-    int foulCount = 0,
-    int yellowCardCount = 0,
-    int redCardCount = 0,
-    int goalkeeperSaves = 0,
-    int cornerCount = 0,
-    String? mvpName,
-    int ownGoals = 0,
-    int freeKicks = 0,
-  }) async {
-    final body = {
-      'match_id': matchId,
-      'team_id': teamId,
-      'passes_count': passesCount,
-      'goal_count': goalCount,
-      'foul_count': foulCount,
-      'yellow_card_count': yellowCardCount,
-      'red_card_count': redCardCount,
-      'goalkeeper_saves': goalkeeperSaves,
-      'corner_count': cornerCount,
-      if (mvpName != null) 'mvp_name': mvpName,
-      'own_goals': ownGoals,
-      'free_kicks': freeKicks,
-    };
-    final res = await http.post(_uri('/match-stats'), headers: _headers, body: jsonEncode(body));
-    return _handleResponse(res);
-  }
-
-  static Future<Map<String, dynamic>> submitPlayerStats({
+  // 🔹 INVITATIONS Table (UPPERCASE to match schema)
+  static Future<Map<String, dynamic>> sendInvitation({
+    required String teamName,
+    required String leagueName,
+    required String playerName,
     required String playerId,
-    String? heatmapImageUrl,
-    required String position,
-    int appearanceCount = 0,
+    required int jerseyNumber,
   }) async {
-    final body = {
-      'player_id': playerId,
-      'heatmap_image_url': heatmapImageUrl,
-      'position': position,
-      'appearance_count': appearanceCount,
-    };
-    final res = await http.post(_uri('/player-stats'), headers: _headers, body: jsonEncode(body));
-    return _handleResponse(res);
-  }
-
-  static Future<Map<String, dynamic>> submitTeamStats({
-    required String teamId,
-    int appearanceCount = 0,
-    int totalOwnGoals = 0,
-  }) async {
-    final body = {
-      'team_id': teamId,
-      'appearance_count': appearanceCount,
-      'total_own_goals': totalOwnGoals,
-    };
-    final res = await http.post(_uri('/team-stats'), headers: _headers, body: jsonEncode(body));
-    return _handleResponse(res);
-  }
-
-  // Legacy/Compatibility methods (if needed by other pages)
-  static Future<Map<String, dynamic>> submitTeamMatchStats({
-    required String matchId,
-    required String teamId,
-    required int goals,
-    required int shots,
-    required int passes,
-    required int fouls,
-    required int yellowCards,
-    required int redCards,
-    required int offsides,
-    required int corners,
-  }) async {
-    return submitMatchStats(
-      matchId: matchId,
-      teamId: teamId,
-      goalCount: goals,
-      passesCount: passes,
-      foulCount: fouls,
-      yellowCardCount: yellowCards,
-      redCardCount: redCards,
-      cornerCount: corners,
+    final res = await http.post(
+      _uri('INVITATIONS'), 
+      headers: _headers, 
+      body: jsonEncode({
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'team_name': teamName,
+        'league_name': leagueName,
+        'player_name': playerName,
+        'player_id': playerId,
+        'jersey_number': jerseyNumber,
+        'status': 'pending',
+        'timestamp': DateTime.now().toIso8601String(),
+      })
     );
+    return _handleResponse(res);
+  }
+
+  static Future<void> updateInvitationStatus(String inviteId, String status) async {
+    await http.patch(
+      _uri('INVITATIONS'),
+      headers: _headers,
+      body: jsonEncode({'status': status}),
+    );
+  }
+
+  // 🔹 Generic CREATE Methods
+  static Future<Map<String, dynamic>> createUser({required String name, required String email, required String nationality, required String phoneNumber}) async {
+    final res = await http.post(_uri('USERS'), headers: _headers, body: jsonEncode({'user_id': DateTime.now().millisecondsSinceEpoch, 'name': name, 'email': email, 'nationality': nationality, 'phone_number': phoneNumber}));
+    return _handleResponse(res);
+  }
+
+  static Future<Map<String, dynamic>> createPlayer({required String fullName, required int jerseyNumber, required String nationality, required double height, required double weight, required String position, required String email, required String phoneNumber, dynamic teamId}) async {
+    final res = await http.post(_uri('PLAYERS'), headers: _headers, body: jsonEncode({'player_id': DateTime.now().millisecondsSinceEpoch, 'full_name': fullName, 'jersey_number': jerseyNumber, 'nationality': nationality, 'height': height, 'weight': weight, 'position': position, 'email': email, 'phone_number': phoneNumber, if (teamId != null) 'team_id': teamId}));
+    return _handleResponse(res);
+  }
+
+  static Future<Map<String, dynamic>> createTournament({required String name, required DateTime startDate, required DateTime endDate}) async {
+    final res = await http.post(_uri('tournaments'), headers: _headers, body: jsonEncode({'tournament_id': DateTime.now().millisecondsSinceEpoch, 'tournament_name': name, 'start_date': startDate.toIso8601String(), 'end_date': endDate.toIso8601String()}));
+    return _handleResponse(res);
+  }
+
+  static Future<Map<String, dynamic>> createTeam({required String name, required String primaryColor, required String secondaryColor}) async {
+    final res = await http.post(_uri('TEAMS'), headers: _headers, body: jsonEncode({'team_id': DateTime.now().millisecondsSinceEpoch, 'team_name': name, 'tshirt_colors': {'primary': primaryColor, 'secondary': secondaryColor}}));
+    return _handleResponse(res);
+  }
+
+  static Future<Map<String, dynamic>> createMatch({required dynamic tournamentId, required dynamic homeTeamId, required dynamic awayTeamId, required DateTime matchDate, String? videoUrl}) async {
+    final res = await http.post(_uri('MATCHES'), headers: _headers, body: jsonEncode({'match_id': DateTime.now().millisecondsSinceEpoch, 'tournament_id': tournamentId, 'home_team_id': homeTeamId, 'away_team_id': awayTeamId, 'match_date': matchDate.toIso8601String(), 'video_url': videoUrl ?? ""}));
+    return _handleResponse(res);
+  }
+
+  // 🔹 STATS Methods
+  static Future<Map<String, dynamic>> submitTeamStats({required dynamic matchId, required dynamic teamId, required int goals, required int passes, required int fouls, required int corners}) async {
+    final res = await http.post(_uri('TEAM_MATCH_STATS'), headers: _headers, body: jsonEncode({'team_stat_id': DateTime.now().millisecondsSinceEpoch, 'match_id': matchId, 'team_id': teamId, 'goals': goals, 'passes': passes, 'foul': fouls, 'corner': corners}));
+    return _handleResponse(res);
+  }
+
+  static Future<Map<String, dynamic>> submitPlayerStats({required dynamic matchId, required dynamic playerId, required int goals, required int assists, required int yellowCard, required int redCard, required double topSpeed, required double totalDistance}) async {
+    final res = await http.post(_uri('PLAYER_MATCH_STATS'), headers: _headers, body: jsonEncode({'player_stat_id': DateTime.now().millisecondsSinceEpoch, 'match_id': matchId, 'player_id': playerId, 'goals': goals, 'assists': assists, 'yellow_card': yellowCard, 'red_card': redCard, 'top_speed': topSpeed, 'total_distance': totalDistance}));
+    return _handleResponse(res);
+  }
+
+  static Future<bool> ping() async {
+    try {
+      final res = await http.get(_uri('PLAYERS'), headers: _headers).timeout(const Duration(seconds: 5));
+      return res.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
   }
 }
 
@@ -256,5 +126,5 @@ class ApiException implements Exception {
   final String message;
   ApiException({required this.statusCode, required this.message});
   @override
-  String toString() => 'ApiException [$statusCode]: $message';
+  String toString() => 'Error $statusCode: $message';
 }

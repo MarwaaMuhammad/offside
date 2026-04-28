@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:offside/navbar.dart';
-
 import 'sign_up.dart';
 
 class SignInPage extends StatefulWidget {
@@ -12,161 +12,127 @@ class SignInPage extends StatefulWidget {
 }
 
 class _SignInPageState extends State<SignInPage> {
-  TextEditingController emailController = TextEditingController();
-  TextEditingController passwordController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
   String errorMessage = "";
-  String email = "";
-  String password = "";
-  void signIn() {
+  bool _isLoading = false;
+
+  Future<void> signIn() async {
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      setState(() => errorMessage = "Please enter email and password");
+      return;
+    }
+
     setState(() {
-      email = emailController.text;
-      password = passwordController.text;
-      if (widget.users.containsKey(email)) {
-        if (widget.users[email] == password) {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => OffsideShell()));
-        } else {
-          errorMessage = "Wrong password";
-        
-        }
-      }else{
-        errorMessage = "User not found";
-      }
+      _isLoading = true;
+      errorMessage = "";
     });
+
+    try {
+      // 🔐 SUPABASE AUTH SIGN IN
+      final AuthResponse res = await Supabase.instance.client.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+
+      if (res.user != null) {
+        // SUCCESS: Fetch user role/data if needed, then navigate
+        if (mounted) {
+          // You can implement logic here to check if the user is a player or user
+          // For now, navigating to the app shell
+          Navigator.pushReplacement(
+            context, 
+            MaterialPageRoute(builder: (context) => const OffsideShell(userName: "Welcome Back"))
+          );
+        }
+      }
+    } on AuthException catch (e) {
+      setState(() => errorMessage = e.message);
+    } catch (e) {
+      setState(() => errorMessage = "An unexpected error occurred");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final Color primary = Colors.blue[900]!;
+
     return Scaffold(
-      resizeToAvoidBottomInset: true,
-      backgroundColor: Color(0xFFFAFAFC),
-      body: SafeArea(child: SingleChildScrollView(
-        child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 30),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      backgroundColor: const Color(0xFFFAFAFC),
+      body: SafeArea(
+        child: Stack(
           children: [
-            const SizedBox(height: 70),
-            // Logo
-            Image.asset(
-              'asset/logo.png',
-              width: 250,
-              height: 250,
-            ),
-            const SizedBox(height: 100),
-            // Email
-            TextField(
-              controller: emailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: InputDecoration(
-                hintText: "Your Email",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
-                  borderSide: BorderSide(color: Colors.blue.shade900),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Password
-            TextField(
-              controller: passwordController,
-              obscureText: true,
-              decoration: InputDecoration(
-                hintText: "Password",
-                suffixText: "Forgot?",
-                suffixStyle: const TextStyle(color: Colors.indigo),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
-                  borderSide: const BorderSide(color: Colors.indigo),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Sign up link
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text("Don’t have an account "),
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => SignUpPage(
-                        users: widget.users,
-                      )),
-                    );
-                  },
-                  child: Text(
-                    "Sign Up",
-                    style: TextStyle(
-                      color: Colors.blue[900],
-                      fontWeight: FontWeight.bold,
+            SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 30),
+              child: Column(
+                children: [
+                  const SizedBox(height: 70),
+                  Image.asset('asset/logo.png', width: 220, height: 220),
+                  const SizedBox(height: 50),
+                  
+                  TextField(
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      hintText: "Your Email",
+                      prefixIcon: Icon(Icons.email, color: primary),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(30)),
                     ),
                   ),
-                )
-              ],
-            ),
-            const SizedBox(height: 24),
+                  const SizedBox(height: 16),
 
-            // Google & Apple buttons
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _socialButton("asset/google_icon.png"),
-                const SizedBox(width: 16),
-                _socialButton("asset/iphone_icon.png"),
-              ],
-            ),
-            const SizedBox(height: 24),
-            // Error message
-            Text(
-              errorMessage,
-              style: const TextStyle(
-                color: Colors.red,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 5),
-            // Sign in button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  signIn();
-                },
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                  TextField(
+                    controller: passwordController,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      hintText: "Password",
+                      prefixIcon: Icon(Icons.lock, color: primary),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(30)),
+                    ),
                   ),
-                  backgroundColor: Colors.blue[900],
-                ),
-                child: const Text(
-                  "Sign In",
-                  style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold),
-                ),
+                  
+                  const SizedBox(height: 20),
+                  if (errorMessage.isNotEmpty)
+                    Text(errorMessage, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : signIn,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                        backgroundColor: primary,
+                      ),
+                      child: const Text("Sign In", style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text("Don't have an account? "),
+                      GestureDetector(
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SignUpPage(users: widget.users))),
+                        child: Text("Sign Up", style: TextStyle(color: primary, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
+            if (_isLoading)
+              Container(color: Colors.black26, child: const Center(child: CircularProgressIndicator())),
           ],
         ),
       ),
-      ))
-    );
-  }
-
-  Widget _socialButton(String asset) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Image.asset(asset, height: 30),
     );
   }
 }
