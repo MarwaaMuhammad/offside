@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:offside/models/leage_model.dart';
 import 'package:offside/models/team_model.dart';
 import 'package:offside/pages_details/details_league.dart';
@@ -14,113 +14,19 @@ class AnalysisPage extends StatefulWidget {
 
 class _AnalysisPageState extends State<AnalysisPage> {
   final leaguesBox = Hive.box<League>('leagues');
-
-  List<Team> allTeams = [];
-  List<League> allLeagues = [];
-
-  List<Team> filteredTeams = [];
-  List<League> filteredLeagues = [];
-
   String searchQuery = "";
 
   @override
-  void initState() {
-    super.initState();
-    loadData();
-  }
-
-  void loadData() {
-    final leagues = leaguesBox.values.toList();
-    List<Team> loadedTeams = [];
-
-    for (final league in leagues) {
-      loadedTeams.addAll(league.teams);
-    }
-
-    setState(() {
-      allLeagues = leagues;
-      allTeams = loadedTeams;
-
-      filteredTeams = allTeams;
-      filteredLeagues = allLeagues;
-    });
-  }
-
-  void onSearch(String text) {
-    searchQuery = text.toLowerCase();
-
-    setState(() {
-      if (searchQuery.isEmpty) {
-        filteredTeams = allTeams;
-        filteredLeagues = allLeagues;
-      } else {
-        filteredTeams = allTeams
-            .where((t) => t.name.toLowerCase().contains(searchQuery))
-            .toList();
-
-        filteredLeagues = allLeagues
-            .where((l) => l.name.toLowerCase().contains(searchQuery))
-            .toList();
-      }
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
-            const SizedBox(height: 10),
-
-            // ============================
-            // TOP LOGO HORIZONTAL SCROLL
-            // ============================
-            SizedBox(
-              height: 90,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                itemCount: filteredTeams.length,
-                itemBuilder: (context, index) {
-                  final team = filteredTeams[index];
-                  return GestureDetector(
-                    onTap: () {
-                      final league =
-                          allLeagues.firstWhere((l) => l.teams.contains(team));
-
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              TeamDetailsPage(team: team, league: league),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      width: 65,
-                      margin: const EdgeInsets.symmetric(horizontal: 10),
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Color(0xFF16246E),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black12,
-                            blurRadius: 5,
-                            offset: Offset(0, 3),
-                          )
-                        ],
-                      ),
-                      child: Image.asset(team.logo),
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            const SizedBox(height: 12),
+            const SizedBox(height: 20),
 
             // ============================
             // SEARCH BAR
@@ -130,42 +36,98 @@ class _AnalysisPageState extends State<AnalysisPage> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
+                  color: colorScheme.surface,
+                  borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 5,
-                      offset: Offset(0, 3),
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     )
                   ],
+                  border: Border.all(color: colorScheme.outline.withOpacity(0.1)),
                 ),
                 child: TextField(
-                  onChanged: onSearch,
-                  decoration: const InputDecoration(
+                  onChanged: (val) => setState(() => searchQuery = val.toLowerCase()),
+                  style: theme.textTheme.bodyLarge,
+                  decoration: InputDecoration(
                     border: InputBorder.none,
                     hintText: "Search teams or leagues...",
-                    icon: Icon(Icons.search, color: Colors.grey),
+                    hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.4)),
+                    icon: Icon(Icons.search, color: colorScheme.onSurface.withOpacity(0.4)),
                   ),
                 ),
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
 
             // ============================
-            // LEAGUES LIST ONLY
+            // RESULTS LIST (REACTIVE)
             // ============================
             Expanded(
-              child: ListView.builder(
-                
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                itemCount: filteredLeagues.length,
-                itemBuilder: (context, index) {
-                  final league = filteredLeagues[index];
+              child: ValueListenableBuilder(
+                valueListenable: leaguesBox.listenable(),
+                builder: (context, Box<League> box, _) {
+                  final allLeagues = box.values.toList();
                   
-                  return leagueTile(league);
+                  // Filter Leagues
+                  final filteredLeagues = searchQuery.isEmpty 
+                      ? allLeagues 
+                      : allLeagues.where((l) => l.name.toLowerCase().contains(searchQuery)).toList();
+
+                  // Extract and Filter Teams
+                  List<Team> allTeams = [];
+                  for (var l in allLeagues) {
+                    allTeams.addAll(l.teams);
+                  }
                   
+                  // Only show teams if searching, otherwise it might be too many
+                  final filteredTeams = searchQuery.isEmpty 
+                      ? [] 
+                      : allTeams.where((t) => t.name.toLowerCase().contains(searchQuery)).toList();
+
+                  if (filteredLeagues.isEmpty && filteredTeams.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.search_off, size: 64, color: colorScheme.outline.withOpacity(0.3)),
+                          const SizedBox(height: 16),
+                          Text(
+                            "No results found",
+                            style: theme.textTheme.titleMedium?.copyWith(color: colorScheme.outline),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    children: [
+                      if (filteredLeagues.isNotEmpty) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4, bottom: 8),
+                          child: Text("LEAGUES", style: theme.textTheme.labelLarge?.copyWith(letterSpacing: 1.2, color: colorScheme.primary)),
+                        ),
+                        ...filteredLeagues.map((l) => leagueTile(l, theme)),
+                        const SizedBox(height: 16),
+                      ],
+                      if (filteredTeams.isNotEmpty) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4, bottom: 8),
+                          child: Text("TEAMS", style: theme.textTheme.labelLarge?.copyWith(letterSpacing: 1.2, color: colorScheme.primary)),
+                        ),
+                        ...filteredTeams.map((t) {
+                          // Find parent league for team details page
+                          final parentLeague = allLeagues.firstWhere((l) => l.teams.contains(t), orElse: () => allLeagues.first);
+                          return teamTile(t, parentLeague, theme);
+                        }),
+                      ],
+                      const SizedBox(height: 40),
+                    ],
+                  );
                 },
               ),
             ),
@@ -175,38 +137,110 @@ class _AnalysisPageState extends State<AnalysisPage> {
     );
   }
 
-  // ================================
-  // LEAGUE CARD
-  // ================================
-  Widget leagueTile(League league) {
-    
+  Widget leagueTile(League league, ThemeData theme) {
+    const Color cardColor = Color(0xFF0D1956);
     return GestureDetector(
-        onTap: () {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => LeaguePage(league: league)));
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => LeaguePage(league: league)),
+        );
       },
       child: Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-      decoration: BoxDecoration(
-        color: Color(0xFF16246E),
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(color: Colors.black12, blurRadius: 5, offset: Offset(0, 2))
-        ],
-      ),
-      child: Row(children: [
-          Image.asset(league.logo, width: 45, height: 45),
-          const SizedBox(width: 12),
-          Text(
-            league.name,
-            style: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w600,
-              color: Colors.white
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: cardColor.withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            )
+          ],
+        ),
+        child: Row(
+          children: [
+            Hero(
+              tag: 'league_logo_${league.name}_${league.backendId}',
+              child: Image.asset(league.logo, width: 40, height: 40),
             ),
-          ),
-        ],
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                league.name,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.white54),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget teamTile(Team team, League league, ThemeData theme) {
+    const Color cardColor = Color(0xFF16246E); 
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TeamDetailsPage(team: team, league: league),
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: cardColor.withOpacity(0.2),
+              blurRadius: 6,
+              offset: const Offset(0, 3),
+            )
+          ],
+        ),
+        child: Row(
+          children: [
+            Hero(
+              tag: 'team_logo_${team.name}_${team.backendId}',
+              child: Image.asset(team.logo, width: 36, height: 36),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    team.name,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  Text(
+                    "Team • ${league.name}",
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white.withOpacity(0.6),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.white54),
+          ],
+        ),
       ),
     );
   }

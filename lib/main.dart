@@ -35,15 +35,12 @@ Future<void> main() async {
     Hive.registerAdapter(MatchStatsAdapter());  
     Hive.registerAdapter(PlayerStatsAdapter()); 
     Hive.registerAdapter(TeamStatsAdapter());   
-    // Hive.registerAdapter(InvitationAdapter()); 
+    Hive.registerAdapter(InvitationAdapter()); 
   } catch (_) {}
   
   await Hive.openBox<League>('leagues');
-  try {
-     await Hive.openBox<Invitation>('invitations');
-  } catch (_) {
-     await Hive.openBox('invitations');
-  }
+  await Hive.openBox<Invitation>('invitations'); 
+  await Hive.openBox<Player>('players'); // Open players box
 
   runApp(const MyApp());
 }

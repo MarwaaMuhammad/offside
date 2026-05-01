@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:offside/models/event_model.dart';
 import 'package:offside/models/leage_model.dart';
 import 'package:offside/models/match_model.dart';
@@ -17,40 +18,43 @@ class MatchDetailsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const Color mainBg = Color(0xFFF0F2F8);
-    const Color cardColor = Color(0xFF0D1956);
-    const Color cardColor2 = Color(0xFF16246E);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    const Color darkBlue = Color(0xFF0D1956);
+
+    final now = DateTime.now();
+    final isUpcoming = now.isBefore(match.date);
+    final isLive = now.isAfter(match.date) &&
+        now.isBefore(match.date.add(const Duration(minutes: 105)));
 
     return Scaffold(
-      backgroundColor: mainBg,
       appBar: AppBar(
-        backgroundColor: mainBg,
-        elevation: 0,
-        title: const Text(
-          "Match Details",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-        ),
-        leading: const BackButton(color: Colors.black87),
+        title: const Text("Match Details"),
+        leading: const BackButton(),
       ),
       body: SingleChildScrollView(
         child: Column(
           children: [
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
             // ================= HEADER =================
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [cardColor, cardColor2],
+                gradient: const LinearGradient(
+                  colors: [darkBlue, Color(0xFF16246E)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -59,28 +63,29 @@ class MatchDetailsPage extends StatelessWidget {
                   Column(
                     children: [
                       Text(
-                        "${match.homeTeamScore} - ${match.awayTeamScore}",
-                        style: const TextStyle(
-                          fontSize: 36,
-                          fontWeight: FontWeight.bold,
+                        isUpcoming 
+                            ? DateFormat('HH:mm').format(match.date)
+                            : "${match.homeTeamScore} - ${match.awayTeamScore}",
+                        style: theme.textTheme.headlineMedium?.copyWith(
                           color: Colors.white,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 4,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          match.status ?? "Ended",
+                          isUpcoming 
+                              ? DateFormat('dd MMM yyyy').format(match.date)
+                              : (isLive ? "LIVE" : (match.status ?? "Full Time")),
                           style: const TextStyle(
-                            color: Colors.black87,
+                            color: Colors.white,
                             fontWeight: FontWeight.bold,
+                            fontSize: 12,
                           ),
                         ),
                       )
@@ -91,39 +96,48 @@ class MatchDetailsPage extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(height: 30),
+            const SizedBox(height: 32),
 
             // ================= TITLE =================
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  "Match Events",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87.withOpacity(0.85),
-                  ),
+                  isUpcoming ? "Match Information" : "Match Timeline",
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
-            // ================= EVENTS TIMELINE =================
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                children: [
-                  ...match.eventsHome.map(
-                    (e) => _eventTimeline(e, true),
-                  ),
-                  ...match.eventsAway.map(
-                    (e) => _eventTimeline(e, false),
-                  ),
-                ],
+            // ================= EVENTS TIMELINE / INFO =================
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: colorScheme.outline.withOpacity(0.1)),
               ),
+              child: isUpcoming 
+                ? ListTile(
+                    leading: const Icon(Icons.calendar_today, color: darkBlue),
+                    title: const Text("Kick-off Time"),
+                    subtitle: Text(DateFormat('EEEE, dd MMMM yyyy - HH:mm').format(match.date)),
+                  )
+                : Column(
+                    children: [
+                      if (match.eventsHome.isEmpty && match.eventsAway.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.all(32.0),
+                          child: Text("No significant events recorded."),
+                        ),
+                      ...match.eventsHome.map((e) => _eventTimeline(context, e, true)),
+                      ...match.eventsAway.map((e) => _eventTimeline(context, e, false)),
+                    ],
+                  ),
             ),
 
             const SizedBox(height: 40),
@@ -133,9 +147,6 @@ class MatchDetailsPage extends StatelessWidget {
     );
   }
 
-  // =========================================================
-  //                 TEAM BOX (LOGO + NAME)
-  // =========================================================
   Widget _teamBox(Team team, League league, BuildContext context) {
     return GestureDetector(
       onTap: () => Navigator.push(
@@ -147,23 +158,24 @@ class MatchDetailsPage extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white24,
-              borderRadius: BorderRadius.circular(20),
+              color: Colors.white.withOpacity(0.1),
+              shape: BoxShape.circle,
             ),
             child: Image.asset(
               team.logo,
-              width: 60,
-              height: 60,
+              width: 56,
+              height: 56,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(
             team.name,
             style: const TextStyle(
               color: Colors.white,
               fontSize: 14,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -171,111 +183,79 @@ class MatchDetailsPage extends StatelessWidget {
     );
   }
 
-  // =========================================================
-  //                      EVENT TIMELINE
-  // =========================================================
-  Widget _eventTimeline(Event event, bool isHomeTeam) {
+  Widget _eventTimeline(BuildContext context, Event event, bool isHomeTeam) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
     IconData icon;
-    Color color;
+    Color iconColor;
 
     switch (event.type) {
       case "Goal":
         icon = Icons.sports_soccer;
-        color = Colors.green;
+        iconColor = Colors.green;
         break;
       case "Yellow Card":
         icon = Icons.square;
-        color = Colors.yellow.shade700;
+        iconColor = Colors.amber;
         break;
       case "Red Card":
         icon = Icons.square;
-        color = Colors.red;
-        break;
-      case "Offside":
-        icon = Icons.flag;
-        color = Colors.redAccent;
+        iconColor = Colors.red;
         break;
       case "Substitution":
-        icon = Icons.compare_arrows;
-        color = Colors.orange;
+        icon = Icons.swap_vert;
+        iconColor = Colors.orange;
         break;
-      case "Shot":
-        icon = Icons.sports;
-        color = Colors.blue;
-        break;
-      case "Corner Kick":
-        icon = Icons.sports_soccer_outlined;
-        color = Colors.teal;
-        break;
-      case "Free Kick":
-        icon = Icons.sports;
-        color = Colors.indigo;
-        break;
-
       default:
-        icon = Icons.info;
-        color = Colors.blueGrey;
+        icon = Icons.info_outline;
+        iconColor = Colors.grey;
     }
 
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 14),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       child: Row(
         children: [
-          // ================= LEFT SIDE =================
           Expanded(
             child: isHomeTeam
                 ? Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      Text(
-                        event.player,
-                        style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87),
+                      Flexible(
+                        child: Text(
+                          event.player,
+                          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.end,
+                        ),
                       ),
                       const SizedBox(width: 8),
-                      Icon(icon, color: color, size: 22),
+                      Icon(icon, color: iconColor, size: 20),
                     ],
                   )
                 : const SizedBox(),
           ),
-
-          // ================= CENTER LINE =================
-          SizedBox(
-            width: 60,
-            child: Column(
-              children: [
-                Text(
-                  "${event.minute}'",
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  width: 2,
-                  height: 40,
-                  color: Colors.black26,
-                ),
-              ],
+          Container(
+            width: 40,
+            alignment: Alignment.center,
+            child: Text(
+              "${event.minute}'",
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface.withOpacity(0.6),
+              ),
             ),
           ),
-
-          // ================= RIGHT SIDE =================
           Expanded(
             child: !isHomeTeam
                 ? Row(
                     children: [
-                      Icon(icon, color: color, size: 22),
+                      Icon(icon, color: iconColor, size: 20),
                       const SizedBox(width: 8),
-                      Text(
-                        event.player,
-                        style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87),
+                      Flexible(
+                        child: Text(
+                          event.player,
+                          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ],
                   )

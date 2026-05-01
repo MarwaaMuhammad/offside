@@ -62,16 +62,18 @@ class _SignUpPageState extends State<SignUpPage> {
         if (mounted) {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => RoleSelectionPage(
-              userName: name, 
-              email: email, 
-              phone: phone
-            )),
+            MaterialPageRoute(
+              builder: (context) => RoleSelectionPage(
+                userName: name,
+                email: email,
+                phone: phone,
+                users: widget.users,
+              ),
+            ),
           );
         }
       }
     } on AuthException catch (e) {
-      // 💡 HCI Trick: If user already exists but isn't confirmed, try signing them in
       if (e.message.toLowerCase().contains("rate limit") || e.message.toLowerCase().contains("already registered")) {
         setState(() => msg_error = "Please wait a moment or check your Supabase rate limit settings.");
       } else {

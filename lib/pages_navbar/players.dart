@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:offside/models/leage_model.dart';
 import 'package:offside/models/player_model.dart';
 import 'package:offside/pages_details/details_player.dart';
+import 'package:offside/services/sync_service.dart';
 
 class PlayersPage extends StatefulWidget {
   const PlayersPage({super.key});
@@ -12,36 +12,56 @@ class PlayersPage extends StatefulWidget {
 }
 
 class _PlayersPageState extends State<PlayersPage> {
-  final leaguesBox = Hive.box<League>('leagues');
-
-  final Color bg = const Color(0xFFF2F3F8);
-  final Color primary = const Color(0xFF0D1956);
-
+  final playersBox = Hive.box<Player>('players');
   String searchQuery = "";
+  bool _isSyncing = false;
 
-  List<Player> getAllPlayers() {
-    List<Player> players = [];
-    for (int i = 0; i < leaguesBox.length; i++) {
-      final league = leaguesBox.getAt(i)!;
-      for (var team in league.teams) {
-        players.addAll(team.players);
-      }
-    }
-    return players;
+  @override
+  void initState() {
+    super.initState();
+    _refreshPlayers();
+  }
+
+  Future<void> _refreshPlayers() async {
+    if (_isSyncing) return;
+    setState(() => _isSyncing = true);
+    await SyncService.fetchAllLeaguesFromBackend();
+    if (mounted) setState(() => _isSyncing = false);
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: bg,
-      
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: const Text("Players"),
+        actions: [
+          if (_isSyncing)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16.0),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _refreshPlayers,
+            ),
+        ],
+      ),
       body: SafeArea(
         child: ValueListenableBuilder(
-          valueListenable: leaguesBox.listenable(),
+          valueListenable: playersBox.listenable(),
           builder: (context, box, _) {
-            final allPlayers = getAllPlayers();
-
-            final players = allPlayers
+            final players = playersBox.values
                 .where((p) =>
                     p.name.toLowerCase().contains(searchQuery.toLowerCase()))
                 .toList();
@@ -50,128 +70,104 @@ class _PlayersPageState extends State<PlayersPage> {
               children: [
                 // ===== Search Bar =====
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(28),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: TextField(
-                      onChanged: (val) => setState(() => searchQuery = val),
-                      decoration: InputDecoration(
-                        hintText: "Search player...",
-                        prefixIcon: const Icon(Icons.search),
-                        border: InputBorder.none,
-                        contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.all(16.0),
+                  child: TextField(
+                    onChanged: (val) => setState(() => searchQuery = val),
+                    decoration: InputDecoration(
+                      hintText: "Search players...",
+                      prefixIcon: const Icon(Icons.search),
+                      filled: true,
+                      fillColor: colorScheme.surface,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
                       ),
                     ),
                   ),
                 ),
 
+                if (_isSyncing && players.isEmpty)
+                  const Expanded(
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+
                 // ===== Players List =====
-                Expanded(
-                  child: players.isEmpty
-                      ? const Center(
-                          child: Text(
-                            "No players found",
-                            style: TextStyle(fontSize: 16, color: Colors.grey),
-                          ),
-                        )
-                      : ListView.builder(
-                          physics: const BouncingScrollPhysics(),
-                          itemCount: players.length,
-                          itemBuilder: (context, index) {
-                            final player = players[index];
+                if (!_isSyncing || players.isNotEmpty)
+                  Expanded(
+                    child: players.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.person_search,
+                                    size: 64,
+                                    color: colorScheme.outline.withOpacity(0.3)),
+                                const SizedBox(height: 16),
+                                const Text("No players found"),
+                                TextButton(
+                                  onPressed: _refreshPlayers,
+                                  child: const Text("Sync Data"),
+                                ),
+                              ],
+                            ),
+                          )
+                        : RefreshIndicator(
+                            onRefresh: _refreshPlayers,
+                            child: ListView.builder(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              itemCount: players.length,
+                              itemBuilder: (context, index) {
+                                final player = players[index];
+                                const Color navy = Color(0xFF0D1956);
 
-                            return AnimatedContainer(
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeOut,
-                              margin: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(18),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.07),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 3),
-                                  )
-                                ],
-                              ),
-                              child: ListTile(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          PlayerDetailsPage(player: player),
+                                return Card(
+                                  margin: const EdgeInsets.symmetric(vertical: 6),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16)),
+                                  child: ListTile(
+                                    contentPadding: const EdgeInsets.all(12),
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              PlayerDetailsPage(player: player),
+                                        ),
+                                      );
+                                    },
+                                    leading: CircleAvatar(
+                                      radius: 28,
+                                      backgroundColor: navy,
+                                      backgroundImage: (player.image != null &&
+                                              player.image!.isNotEmpty)
+                                          ? AssetImage(player.image!)
+                                          : null,
+                                      child: (player.image == null ||
+                                              player.image!.isEmpty)
+                                          ? const Icon(Icons.person,
+                                              color: Colors.white, size: 30)
+                                          : null,
                                     ),
-                                  );
-                                },
-
-                                // ===== Player Image / Initial =====
-                                leading: Container(
-                                  width: 55,
-                                  height: 55,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(14),
-                                    color: primary,
-                                    image: player.image != null
-                                        ? DecorationImage(
-                                            image: AssetImage(player.image!),
-                                            fit: BoxFit.cover,
-                                          )
-                                        : null,
+                                    title: Text(
+                                      player.name,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16),
+                                    ),
+                                    subtitle: Text(
+                                      "${player.position} • Jersey #${player.number}",
+                                      style: TextStyle(
+                                          color: colorScheme.onSurface
+                                              .withOpacity(0.6)),
+                                    ),
+                                    trailing: const Icon(Icons.chevron_right),
                                   ),
-                                  alignment: Alignment.center,
-                                  child: player.image == null
-                                      ? Text(
-                                          player.name[0].toUpperCase(),
-                                          style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 20,
-                                              fontWeight: FontWeight.bold),
-                                        )
-                                      : null,
-                                ),
-
-                                // ===== Player Name =====
-                                title: Text(
-                                  player.name,
-                                  style: TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.grey.shade900),
-                                ),
-
-                                // ===== Stats =====
-                                subtitle: Text(
-                                  "Goals: ${player.goals} • Assists: ${player.assists}",
-                                  style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.black54),
-                                ),
-
-                                trailing: const Icon(
-                                  Icons.arrow_forward_ios,
-                                  color: Colors.grey,
-                                  size: 18,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                ),
+                                );
+                              },
+                            ),
+                          ),
+                  ),
               ],
             );
           },

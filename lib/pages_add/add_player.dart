@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:offside/models/player_model.dart';
 import 'package:offside/models/team_model.dart';
-import 'package:offside/models/invitation_model.dart';
 import 'package:offside/services/api_service.dart';
-import 'package:uuid/uuid.dart';
 
 class CreatePlayersPage extends StatefulWidget {
   final Team team;
@@ -31,7 +29,6 @@ class _CreatePlayersPageState extends State<CreatePlayersPage> {
   Future<void> _fetchPlayersFromBackend() async {
     setState(() => _isLoading = true);
     try {
-      // 🚀 Fetch live data from Supabase
       final players = await ApiService.getAllPlayers();
       setState(() {
         allAvailablePlayers = players;
@@ -52,10 +49,14 @@ class _CreatePlayersPageState extends State<CreatePlayersPage> {
     setState(() {
       filteredPlayers = allAvailablePlayers
           .where((p) =>
-              p['full_name'].toString().toLowerCase().contains(query.toLowerCase()) ||
-              p['email'].toString().toLowerCase().contains(query.toLowerCase()))
+              (p['full_name'] ?? "").toString().toLowerCase().contains(query.toLowerCase()) ||
+              (p['email'] ?? "").toString().toLowerCase().contains(query.toLowerCase()))
           .toList();
     });
+  }
+
+  String _getPlayerId(Map<String, dynamic> player) {
+    return (player['player_id'] ?? player['id'] ?? "").toString();
   }
 
   void _showJerseyDialog(Map<String, dynamic> player) {
@@ -75,7 +76,7 @@ class _CreatePlayersPageState extends State<CreatePlayersPage> {
             onPressed: () {
               if (jerseyController.text.isNotEmpty) {
                 setState(() {
-                  selectedPlayersWithJersey[player['player_id'].toString()] = int.parse(jerseyController.text);
+                  selectedPlayersWithJersey[_getPlayerId(player)] = int.parse(jerseyController.text);
                 });
                 Navigator.pop(context);
               }
@@ -87,37 +88,32 @@ class _CreatePlayersPageState extends State<CreatePlayersPage> {
     );
   }
 
-  Future<void> _sendInvitations() async {
-    setState(() => _isLoading = true);
-    try {
-      for (var entry in selectedPlayersWithJersey.entries) {
-        final player = allAvailablePlayers.firstWhere((p) => p['player_id'].toString() == entry.key);
-        
-        // 🚀 Send official invitation via Backend
-        await ApiService.sendInvitation(
-          teamName: widget.team.name,
-          leagueName: widget.leagueName,
-          playerName: player['full_name'],
-          playerId: player['player_id'].toString(),
-          jerseyNumber: entry.value,
+  void _confirmPlayers() {
+    for (var entry in selectedPlayersWithJersey.entries) {
+      final playerMap = allAvailablePlayers.firstWhere(
+        (p) => _getPlayerId(p) == entry.key,
+        orElse: () => {},
+      );
+      
+      if (playerMap.isNotEmpty) {
+        final newPlayer = Player(
+          name: playerMap['full_name'] ?? "Unknown",
+          position: playerMap['position'] ?? "Unknown",
+          age: playerMap['age'] ?? 20,
+          nationality: playerMap['nationality'] ?? "Unknown",
+          number: entry.value,
+          height: (playerMap['height'] as num?)?.toDouble(),
+          weight: (playerMap['weight'] as num?)?.toDouble(),
+          backendId: entry.key,
         );
-      }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("✅ Invitations sent successfully!"), backgroundColor: Colors.green),
-        );
-        Navigator.pop(context, widget.team);
+        if (!widget.team.players.any((p) => p.backendId == newPlayer.backendId)) {
+          widget.team.players.add(newPlayer);
+        }
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("❌ Failed to send invitations: $e"), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
+
+    Navigator.pop(context, widget.team);
   }
 
   @override
@@ -127,11 +123,11 @@ class _CreatePlayersPageState extends State<CreatePlayersPage> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text("Invite Players"),
+        title: const Text("Add Players"),
         actions: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Center(child: Text("${selectedPlayersWithJersey.length} Invited", style: const TextStyle(fontWeight: FontWeight.bold))),
+            child: Center(child: Text("${selectedPlayersWithJersey.length} Selected", style: const TextStyle(fontWeight: FontWeight.bold))),
           )
         ],
       ),
@@ -155,13 +151,13 @@ class _CreatePlayersPageState extends State<CreatePlayersPage> {
               ),
               Expanded(
                 child: filteredPlayers.isEmpty && !_isLoading
-                    ? const Center(child: Text("No players found in Supabase"))
+                    ? const Center(child: Text("No players found"))
                     : ListView.builder(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         itemCount: filteredPlayers.length,
                         itemBuilder: (context, index) {
                           final player = filteredPlayers[index];
-                          final String pId = player['player_id'].toString();
+                          final String pId = _getPlayerId(player);
                           final isSelected = selectedPlayersWithJersey.containsKey(pId);
 
                           return Card(
@@ -171,12 +167,12 @@ class _CreatePlayersPageState extends State<CreatePlayersPage> {
                             ),
                             child: ListTile(
                               onTap: () => isSelected ? setState(() => selectedPlayersWithJersey.remove(pId)) : _showJerseyDialog(player),
-                              leading: CircleAvatar(child: Text(player['full_name'][0])),
-                              title: Text(player['full_name']),
+                              leading: CircleAvatar(child: Text((player['full_name'] ?? "?")[0])),
+                              title: Text(player['full_name'] ?? "Unknown"),
                               subtitle: isSelected 
                                 ? Text("Jersey: #${selectedPlayersWithJersey[pId]}", style: TextStyle(color: primary, fontWeight: FontWeight.bold))
                                 : Text("${player['position']} • ${player['nationality']}"),
-                              trailing: isSelected ? Icon(Icons.mail_outline, color: primary) : const Icon(Icons.add_circle_outline),
+                              trailing: isSelected ? Icon(Icons.check_circle, color: primary) : const Icon(Icons.add_circle_outline),
                             ),
                           );
                         },
@@ -185,13 +181,13 @@ class _CreatePlayersPageState extends State<CreatePlayersPage> {
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: ElevatedButton(
-                  onPressed: selectedPlayersWithJersey.isEmpty || _isLoading ? null : _sendInvitations,
+                  onPressed: selectedPlayersWithJersey.isEmpty ? null : _confirmPlayers,
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 55),
                     backgroundColor: primary,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                   ),
-                  child: const Text("Send Invitations", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                  child: const Text("Add Selected Players", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
               )
             ],

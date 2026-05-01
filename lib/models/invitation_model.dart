@@ -1,32 +1,35 @@
 import 'package:hive/hive.dart';
 
-// part 'invitation_model.g.dart';
+part 'invitation_model.g.dart';
 
-// @HiveType(typeId: 8)
+@HiveType(typeId: 8)
 class Invitation extends HiveObject {
-  // @HiveField(0)
+  @HiveField(0)
   String id;
 
-  // @HiveField(1)
+  @HiveField(1)
   String teamName;
 
-  // @HiveField(2)
+  @HiveField(2)
   String leagueName;
 
-  // @HiveField(3)
+  @HiveField(3)
   String playerName;
 
-  // @HiveField(4)
+  @HiveField(4)
   String playerId;
 
-  // @HiveField(5)
+  @HiveField(5)
   int jerseyNumber;
 
-  // @HiveField(6)
+  @HiveField(6)
   String status; // 'pending', 'accepted', 'rejected'
 
-  // @HiveField(7)
+  @HiveField(7)
   DateTime timestamp;
+
+  @HiveField(8)
+  String? teamId;
 
   Invitation({
     required this.id,
@@ -37,5 +40,6 @@ class Invitation extends HiveObject {
     required this.jerseyNumber,
     this.status = 'pending',
     required this.timestamp,
+    this.teamId,
   });
 }

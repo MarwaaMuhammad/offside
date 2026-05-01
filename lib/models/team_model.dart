@@ -47,6 +47,9 @@ class Team extends HiveObject {
   @HiveField(13)
   String? secondaryColor;
 
+  @HiveField(14)
+  String? goalkeeperColor;
+
   Team({
     required this.name,
     required this.logo,
@@ -62,5 +65,6 @@ class Team extends HiveObject {
     this.backendId,
     this.primaryColor,
     this.secondaryColor,
+    this.goalkeeperColor,
   });
 }

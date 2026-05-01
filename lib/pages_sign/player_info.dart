@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:offside/navbar.dart';
+import 'package:offside/pages_sign/sign_in.dart';
 import 'package:offside/services/api_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -8,7 +8,8 @@ class PlayerInfoPage extends StatefulWidget {
   final String userName;
   final String? email;
   final String? phone;
-  const PlayerInfoPage({super.key, required this.userName, this.email, this.phone});
+  final Map<String, String> users;
+  const PlayerInfoPage({super.key, required this.userName, this.email, this.phone, required this.users});
 
   @override
   State<PlayerInfoPage> createState() => _PlayerInfoPageState();
@@ -47,11 +48,9 @@ class _PlayerInfoPageState extends State<PlayerInfoPage> {
       setState(() => _isLoading = true);
 
       try {
-        // 🚀 Get the actual authenticated user ID from Supabase
         final user = Supabase.instance.client.auth.currentUser;
         if (user == null) throw Exception("Authentication session expired. Please sign up again.");
 
-        // Sync to backend PLAYERS table using the real Auth UUID
         await ApiService.createPlayer(
           fullName: widget.userName,
           jerseyNumber: 0, 
@@ -64,9 +63,12 @@ class _PlayerInfoPageState extends State<PlayerInfoPage> {
         );
 
         if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Profile created! Please sign in.")),
+          );
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (_) => OffsideShell(userRole: "player", userName: widget.userName)),
+            MaterialPageRoute(builder: (_) => SignInPage(users: widget.users)),
             (route) => false,
           );
         }

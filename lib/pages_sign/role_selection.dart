@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:offside/navbar.dart';
 import 'package:offside/pages_sign/player_info.dart';
+import 'package:offside/pages_sign/sign_in.dart';
 import 'package:offside/services/api_service.dart';
 
 class RoleSelectionPage extends StatefulWidget {
   final String userName;
   final String? email;
   final String? phone;
-  const RoleSelectionPage({super.key, required this.userName, this.email, this.phone});
+  final Map<String, String> users;
+  const RoleSelectionPage({super.key, required this.userName, this.email, this.phone, required this.users});
 
   @override
   State<RoleSelectionPage> createState() => _RoleSelectionPageState();
@@ -19,7 +20,6 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
   Future<void> _handleRegularUser() async {
     setState(() => _isLoading = true);
     try {
-      // 🚀 Fix: Ensured phoneNumber is passed correctly as defined in ApiService
       await ApiService.createUser(
         name: widget.userName,
         email: widget.email ?? "user_${DateTime.now().millisecondsSinceEpoch}@example.com",
@@ -28,9 +28,12 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
       );
 
       if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Profile created! Please sign in.")),
+        );
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => OffsideShell(userRole: "user", userName: widget.userName)),
+          MaterialPageRoute(builder: (_) => SignInPage(users: widget.users)),
           (route) => false,
         );
       }
@@ -64,7 +67,7 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
                   _roleCard(context, title: "Regular User", subtitle: "Follow matches, follow teams, and track stats.", icon: Icons.person, onTap: _handleRegularUser),
                   const SizedBox(height: 20),
                   _roleCard(context, title: "Player", subtitle: "Join teams, track your personal stats, and play matches.", icon: Icons.sports_soccer, onTap: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => PlayerInfoPage(userName: widget.userName, email: widget.email, phone: widget.phone)));
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => PlayerInfoPage(userName: widget.userName, email: widget.email, phone: widget.phone, users: widget.users)));
                   }),
                 ],
               ),

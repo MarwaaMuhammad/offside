@@ -81,7 +81,7 @@ class _OffsideShellState extends State<OffsideShell> {
               _buildNavItem(index: 0, label: "Matches", icon: 'asset/icons/guidance_stadium.svg'),
               _buildNavItem(index: 1, label: "Analysis", icon: 'asset/icons/analysis.svg'),
               const SizedBox(width: 50),
-              _buildNavItem(index: 3, label: "Search", icon: 'asset/icons/play-football.svg'),
+              _buildNavItem(index: 3, label: "Players", icon: 'asset/icons/play-football.svg'),
               _buildNavItem(index: 4, label: "Settings", icon: 'asset/icons/profile.svg'),
             ],
           ),
