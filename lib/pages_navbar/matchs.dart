@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
@@ -190,7 +190,7 @@ class _MatchesPageState extends State<MatchesPage>
                           boxShadow: isSelected
                               ? [
                                   BoxShadow(
-                                    color: primary.withOpacity(0.35),
+                                    color: primary.withValues(alpha: 0.35),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   )
@@ -325,7 +325,7 @@ class _MatchesPageState extends State<MatchesPage>
           const SizedBox(width: 8),
           Expanded(
             child: Divider(
-                color: primary.withOpacity(0.3), thickness: 1),
+                color: primary.withValues(alpha: 0.3), thickness: 1),
           ),
         ],
       ),
@@ -368,7 +368,7 @@ class _MatchesPageState extends State<MatchesPage>
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isLive
-                ? primary.withOpacity(0.4)
+                ? primary.withValues(alpha: 0.4)
                 : (isDark
                     ? AppColors.darkDivider
                     : AppColors.lightDivider),
@@ -376,7 +376,7 @@ class _MatchesPageState extends State<MatchesPage>
           boxShadow: isLive
               ? [
                   BoxShadow(
-                    color: primary.withOpacity(0.15),
+                    color: primary.withValues(alpha: 0.15),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   )
@@ -517,7 +517,7 @@ class _MatchesPageState extends State<MatchesPage>
           color: AppColors.darkPrimary,
           boxShadow: [
             BoxShadow(
-                color: AppColors.darkPrimary.withOpacity(0.7),
+                color: AppColors.darkPrimary.withValues(alpha: 0.7),
                 blurRadius: 6,
                 spreadRadius: 1)
           ],
@@ -531,7 +531,7 @@ class _MatchesPageState extends State<MatchesPage>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 64, color: textSec.withOpacity(0.3)),
+          Icon(icon, size: 64, color: textSec.withValues(alpha: 0.3)),
           const SizedBox(height: 16),
           Text(msg,
               style: GoogleFonts.inter(

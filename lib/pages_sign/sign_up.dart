@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:offside/pages_sign/role_selection.dart';
+import 'package:offside/theme_provider.dart';
 
 class SignUpPage extends StatefulWidget {
   final Map<String, String> users;
@@ -11,160 +13,277 @@ class SignUpPage extends StatefulWidget {
 }
 
 class _SignUpPageState extends State<SignUpPage> {
-  final TextEditingController nameController = TextEditingController();
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController phoneController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmPasswordController = TextEditingController();
-
-  String msg_error = "";
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
+  String _error = '';
   bool _isLoading = false;
+  bool _obscurePass = true;
+  bool _obscureConfirm = true;
 
-  bool isValidEmail(String email) {
-    return RegExp(r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+").hasMatch(email);
-  }
+  bool _isValidEmail(String e) =>
+      RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$').hasMatch(e);
 
   Future<void> _signUp() async {
-    String name = nameController.text.trim();
-    String email = emailController.text.trim();
-    String phone = phoneController.text.trim();
-    String password = passwordController.text.trim();
-    String confirmPassword = confirmPasswordController.text.trim();
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final phone = _phoneController.text.trim();
+    final pass = _passwordController.text.trim();
+    final confirm = _confirmController.text.trim();
 
-    if (name.isEmpty || email.isEmpty || phone.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
-      setState(() => msg_error = "Please fill all fields");
+    if ([name, email, phone, pass, confirm].any((f) => f.isEmpty)) {
+      setState(() => _error = 'Please fill all fields.');
+      return;
+    }
+    if (!_isValidEmail(email)) {
+      setState(() => _error = 'Please enter a valid email address.');
+      return;
+    }
+    if (pass != confirm) {
+      setState(() => _error = 'Passwords do not match.');
       return;
     }
 
-    if (!isValidEmail(email)) {
-      setState(() => msg_error = "Please enter a valid email address");
-      return;
-    }
-
-    if (password != confirmPassword) {
-      setState(() => msg_error = "Passwords do not match");
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      msg_error = "";
-    });
+    setState(() { _isLoading = true; _error = ''; });
 
     try {
-      // 🔐 SUPABASE AUTH SIGN UP
-      final AuthResponse res = await Supabase.instance.client.auth.signUp(
-        email: email,
-        password: password,
-      );
-
-      if (res.user != null) {
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => RoleSelectionPage(
-                userName: name,
-                email: email,
-                phone: phone,
-                users: widget.users,
-              ),
+      final AuthResponse res =
+          await Supabase.instance.client.auth.signUp(email: email, password: pass);
+      if (res.user != null && mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => RoleSelectionPage(
+              userName: name,
+              email: email,
+              phone: phone,
+              users: widget.users,
             ),
-          );
-        }
+          ),
+        );
       }
     } on AuthException catch (e) {
-      if (e.message.toLowerCase().contains("rate limit") || e.message.toLowerCase().contains("already registered")) {
-        setState(() => msg_error = "Please wait a moment or check your Supabase rate limit settings.");
-      } else {
-        setState(() => msg_error = e.message);
-      }
-    } catch (e) {
-      setState(() => msg_error = "An unexpected error occurred");
+      setState(() => _error = e.message.contains('rate limit') || e.message.contains('already registered')
+          ? 'This email is already registered. Please sign in.'
+          : e.message);
+    } catch (_) {
+      setState(() => _error = 'An unexpected error occurred.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _passwordController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final Color primary = Colors.blue[900]!;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = isDark ? AppColors.darkPrimary : AppColors.lightPrimary;
+    final bg = isDark ? AppColors.darkBg : AppColors.lightBg;
+    final cardBg = isDark ? AppColors.darkCard : AppColors.lightCard;
+    final textPri = isDark ? AppColors.darkTextPri : AppColors.lightTextPri;
+    final textSec = isDark ? AppColors.darkTextSec : AppColors.lightTextSec;
+    final divider = isDark ? AppColors.darkDivider : AppColors.lightDivider;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFC),
+      backgroundColor: bg,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: bg,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, size: 28, color: primary),
+          icon: Icon(Icons.arrow_back_ios_rounded, size: 18, color: textPri),
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Stack(
-        children: [
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 30),
+      body: SafeArea(
+        top: false,
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 28),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Image.asset('asset/logo.png', width: 120, height: 120),
-                  Text(
-                    "Create your account",
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: primary),
+                  Center(
+                    child: Image.asset('asset/logo.png', width: 100, height: 100),
                   ),
-                  const SizedBox(height: 20),
-                  _buildTextField(nameController, "Full Name", Icons.person, false),
-                  const SizedBox(height: 12),
-                  _buildTextField(emailController, "Email Address", Icons.email, false),
-                  const SizedBox(height: 12),
-                  _buildTextField(phoneController, "Phone Number", Icons.phone, false, keyboardType: TextInputType.phone),
-                  const SizedBox(height: 12),
-                  _buildTextField(passwordController, "Password", Icons.lock, true),
-                  const SizedBox(height: 12),
-                  _buildTextField(confirmPasswordController, "Confirm Password", Icons.lock_outline, true),
-                  const SizedBox(height: 20),
-                  if (msg_error.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Text(msg_error, textAlign: TextAlign.center, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Center(
+                    child: Text('Create Account',
+                        style: GoogleFonts.inter(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                            color: textPri)),
+                  ),
+                  Center(
+                    child: Text('Join the Offside community',
+                        style: GoogleFonts.inter(fontSize: 13, color: textSec)),
+                  ),
+                  const SizedBox(height: 28),
+
+                  // Fields card
+                  Container(
+                    decoration: BoxDecoration(
+                      color: cardBg,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: divider),
                     ),
-                  const SizedBox(height: 20),
+                    child: Column(
+                      children: [
+                        _fieldRow(_nameController, 'Full Name',
+                            Icons.person_outline, primary, textPri, textSec, divider),
+                        Divider(height: 1, color: divider, indent: 54),
+                        _fieldRow(_emailController, 'Email Address',
+                            Icons.email_outlined, primary, textPri, textSec, divider,
+                            keyboardType: TextInputType.emailAddress),
+                        Divider(height: 1, color: divider, indent: 54),
+                        _fieldRow(_phoneController, 'Phone Number',
+                            Icons.phone_outlined, primary, textPri, textSec, divider,
+                            keyboardType: TextInputType.phone),
+                        Divider(height: 1, color: divider, indent: 54),
+                        _fieldRow(_passwordController, 'Password',
+                            Icons.lock_outline, primary, textPri, textSec, divider,
+                            obscure: _obscurePass,
+                            suffix: IconButton(
+                              icon: Icon(
+                                _obscurePass
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                                color: textSec, size: 18,
+                              ),
+                              onPressed: () =>
+                                  setState(() => _obscurePass = !_obscurePass),
+                            )),
+                        Divider(height: 1, color: divider, indent: 54),
+                        _fieldRow(_confirmController, 'Confirm Password',
+                            Icons.lock_outline, primary, textPri, textSec, divider,
+                            obscure: _obscureConfirm,
+                            suffix: IconButton(
+                              icon: Icon(
+                                _obscureConfirm
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                                color: textSec, size: 18,
+                              ),
+                              onPressed: () =>
+                                  setState(() => _obscureConfirm = !_obscureConfirm),
+                            )),
+                      ],
+                    ),
+                  ),
+
+                  // Error
+                  if (_error.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.darkError.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color: AppColors.darkError.withValues(alpha: 0.3)),
+                      ),
+                      child: Text(_error,
+                          style: GoogleFonts.inter(
+                              fontSize: 13, color: AppColors.darkError)),
+                    ),
+                  ],
+
+                  const SizedBox(height: 28),
+
                   SizedBox(
                     width: double.infinity,
+                    height: 52,
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _signUp,
                       style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                         backgroundColor: primary,
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                        elevation: 0,
                       ),
-                      child: const Text(
-                        "Sign Up",
-                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 22, height: 22,
+                              child: CircularProgressIndicator(
+                                  color: Colors.black, strokeWidth: 2.5))
+                          : Text('Create Account',
+                              style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w800, fontSize: 16)),
                     ),
                   ),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
-          ),
-          if (_isLoading)
-            Container(color: Colors.black26, child: const Center(child: CircularProgressIndicator())),
-        ],
+            if (_isLoading)
+              Container(
+                color: Colors.black.withValues(alpha: 0.3),
+                child: Center(
+                    child: CircularProgressIndicator(color: primary)),
+              ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String hint, IconData icon, bool obscure, {TextInputType keyboardType = TextInputType.text}) {
-    return TextField(
-      controller: controller,
-      obscureText: obscure,
-      keyboardType: keyboardType,
-      decoration: InputDecoration(
-        hintText: hint,
-        prefixIcon: Icon(icon, color: Colors.blue[900]),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(30)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+  Widget _fieldRow(
+    TextEditingController controller,
+    String hint,
+    IconData icon,
+    Color primary,
+    Color textPri,
+    Color textSec,
+    Color divider, {
+    TextInputType keyboardType = TextInputType.text,
+    bool obscure = false,
+    Widget? suffix,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        children: [
+          Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(
+              color: primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: primary, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              obscureText: obscure,
+              keyboardType: keyboardType,
+              style: GoogleFonts.inter(fontSize: 14, color: textPri),
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: GoogleFonts.inter(color: textSec, fontSize: 13),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                suffixIcon: suffix,
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

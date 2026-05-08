@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -32,7 +33,7 @@ class ApiService {
   };
 
   static dynamic _handleResponse(http.Response res) {
-    print("📡 [API Response] ${res.statusCode} | ${res.body}");
+    debugPrint("📡 [API Response] ${res.statusCode} | ${res.body}");
     if (res.statusCode >= 200 && res.statusCode < 300) {
       if (res.body.isEmpty) return null;
       final decoded = jsonDecode(res.body);
@@ -44,7 +45,7 @@ class ApiService {
   }
 
   static dynamic _handleListResponse(http.Response res) {
-    print("📡 [API List Response] ${res.statusCode}");
+    debugPrint("📡 [API List Response] ${res.statusCode}");
     if (res.statusCode >= 200 && res.statusCode < 300) {
       return jsonDecode(res.body);
     } else {
@@ -54,45 +55,81 @@ class ApiService {
 
   // --- USER & PLAYER DATA FETCHING ---
 
-  /// Fetches user/player profile data using the Supabase client for better reliability and RLS support.
+  /// Fetches user/player profile data.
+  /// First checks the PLAYERS table, then the USERS table.
   static Future<Map<String, dynamic>?> fetchUserData(String email) async {
-    print("🔍 [API] Fetching profile for: $email");
+    final trimmedEmail = email.trim().toLowerCase();
+    debugPrint("🔍 [API] Fetching profile for: $trimmedEmail");
     
     try {
-      // 1. Check PLAYERS table
+      // 1. Check PLAYERS table using Supabase Client
+      debugPrint("🔍 [API] Checking PLAYERS table...");
       final playerRes = await Supabase.instance.client
           .from('PLAYERS')
           .select()
-          .ilike('email', email.trim())
+          .ilike('email', trimmedEmail)
           .maybeSingle();
       
       if (playerRes != null) {
         final data = Map<String, dynamic>.from(playerRes);
         data['role'] = 'player';
-        print("✅ [API] Found player profile");
+        debugPrint("✅ [API] Found record in PLAYERS table");
         return data;
       }
 
-      // 2. Check USERS table
+      // 2. Check USERS table using Supabase Client
+      debugPrint("🔍 [API] Record not found in PLAYERS. Checking USERS table...");
       final userRes = await Supabase.instance.client
           .from('USERS')
           .select()
-          .ilike('email', email.trim())
+          .ilike('email', trimmedEmail)
           .maybeSingle();
 
       if (userRes != null) {
         final data = Map<String, dynamic>.from(userRes);
         data['role'] = 'user';
-        print("✅ [API] Found user profile");
+        debugPrint("✅ [API] Found record in USERS table");
         return data;
       }
       
-      print("⚠️ [API] No profile found in PLAYERS or USERS for $email");
+      debugPrint("⚠️ [API] No record found in PLAYERS or USERS for email: $trimmedEmail");
       return null;
     } catch (e) {
-      print("❌ [API] fetchUserData critical error: $e");
-      rethrow;
+      debugPrint("❌ [API] fetchUserData error: $e");
+      // Fallback to raw HTTP if client fails for any reason
+      return _fetchUserDataFallback(trimmedEmail);
     }
+  }
+
+  /// Fallback method using raw HTTP in case Supabase client has issues
+  static Future<Map<String, dynamic>?> _fetchUserDataFallback(String email) async {
+    debugPrint("🔄 [API] Attempting fallback fetch for: $email");
+    try {
+      final playerRes = await http.get(
+        _uri('PLAYERS', queryParameters: {'email': 'ilike.$email'}),
+        headers: _headers,
+      );
+      final playerData = _handleListResponse(playerRes);
+      if (playerData is List && playerData.isNotEmpty) {
+        final data = Map<String, dynamic>.from(playerData.first);
+        data['role'] = 'player';
+        return data;
+      }
+
+      final userRes = await http.get(
+        _uri('USERS', queryParameters: {'email': 'ilike.$email'}),
+        headers: _headers,
+      );
+      final userData = _handleListResponse(userRes);
+      if (userData is List && userData.isNotEmpty) {
+        final data = Map<String, dynamic>.from(userData.first);
+        data['role'] = 'user';
+        return data;
+      }
+    } catch (e) {
+      debugPrint("❌ [API] Fallback fetch failed: $e");
+    }
+    return null;
   }
 
   static Future<void> updateUserProfile({
@@ -101,23 +138,34 @@ class ApiService {
     required Map<String, dynamic> updates,
   }) async {
     final table = role == 'player' ? 'PLAYERS' : 'USERS';
+    debugPrint("📤 [API] Updating $table for $email");
     
-    // Use Supabase client for updates - more reliable than raw HTTP
-    await Supabase.instance.client
-        .from(table)
-        .update(updates)
-        .ilike('email', email.trim());
-    
-    print("✅ [API] Profile updated successfully in $table");
+    try {
+      await Supabase.instance.client
+          .from(table)
+          .update(updates)
+          .ilike('email', email.trim());
+      debugPrint("✅ [API] Update successful");
+    } catch (e) {
+      debugPrint("❌ [API] Update error: $e");
+      // Fallback to raw HTTP
+      final res = await http.patch(
+        _uri(table, queryParameters: {'email': 'ilike.${email.trim()}'}),
+        headers: _headers,
+        body: jsonEncode(updates),
+      );
+      _handleResponse(res);
+    }
   }
 
-  // ⚠️ Change 'profile-images' below to match your Supabase Storage bucket name exactly.
-  static const String _storageBucket = 'profile-images';
+  // Set this to your Supabase storage bucket name (e.g., 'avatars', 'profile_images', etc.)
+  static const String _storageBucket = 'avatars'; 
 
   static Future<String?> uploadProfileImage(File file, String userId) async {
     final fileName = '$userId-${DateTime.now().millisecondsSinceEpoch}.jpg';
     final path = 'profile_images/$fileName';
     
+    debugPrint("📤 [API] Uploading image to bucket: $_storageBucket");
     try {
       await Supabase.instance.client.storage
           .from(_storageBucket)
@@ -127,11 +175,13 @@ class ApiService {
           .from(_storageBucket)
           .getPublicUrl(path);
       
-      print("✅ [API] Image uploaded: $imageUrl");
+      debugPrint("✅ [API] Image upload successful: $imageUrl");
       return imageUrl;
     } catch (e) {
-      print("❌ [API] Image upload error: $e");
-      // Rethrow so the UI can show a meaningful error message
+      debugPrint("❌ [API] Image upload error: $e");
+      if (e.toString().contains('Bucket not found')) {
+        throw Exception("Storage bucket '$_storageBucket' not found. Please create it in your Supabase project.");
+      }
       rethrow;
     }
   }

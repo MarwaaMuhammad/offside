@@ -69,7 +69,7 @@ class _ApiTestPageState extends State<ApiTestPage> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                _btn("Ping Server", _testPing, Colors.green),
+                _btn("Ping Server", _testPing, const Color(0xFF0066FF)),
                 _btn("POST tournament", _testCreateTournament, Colors.blue),
                 _btn("Clear log", () => setState(() => _log.clear()), Colors.red),
               ],

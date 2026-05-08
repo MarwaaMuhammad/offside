@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:offside/navbar.dart';
+import 'package:offside/services/api_service.dart';
+import 'package:offside/theme_provider.dart';
 import 'sign_up.dart';
 
 class SignInPage extends StatefulWidget {
@@ -12,116 +15,214 @@ class SignInPage extends StatefulWidget {
 }
 
 class _SignInPageState extends State<SignInPage> {
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
-  String errorMessage = "";
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  String _error = '';
   bool _isLoading = false;
+  bool _obscurePassword = true;
 
-  Future<void> signIn() async {
-    final email = emailController.text.trim();
-    final password = passwordController.text.trim();
+  Future<void> _signIn() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
-      setState(() => errorMessage = "Please enter email and password");
+      setState(() => _error = 'Please enter email and password.');
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-      errorMessage = "";
-    });
+    setState(() { _isLoading = true; _error = ''; });
 
     try {
-      // 🔐 SUPABASE AUTH SIGN IN
-      final AuthResponse res = await Supabase.instance.client.auth.signInWithPassword(
-        email: email,
-        password: password,
-      );
+      final AuthResponse res = await Supabase.instance.client.auth
+          .signInWithPassword(email: email, password: password);
 
-      if (res.user != null) {
-        // SUCCESS: Fetch user role/data if needed, then navigate
-        if (mounted) {
-          // You can implement logic here to check if the user is a player or user
-          // For now, navigating to the app shell
-          Navigator.pushReplacement(
-            context, 
-            MaterialPageRoute(builder: (context) => const OffsideShell(userName: "Welcome Back"))
-          );
-        }
+      if (res.user != null && mounted) {
+        // Determine role
+        String role = 'user';
+        String? userName;
+        try {
+          final data = await ApiService.fetchUserData(email);
+          if (data != null) {
+            role = data['role'] ?? 'user';
+            userName = data['full_name'] ?? data['name'];
+          }
+        } catch (_) {}
+
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => OffsideShell(
+              userRole: role,
+              userName: userName ?? email,
+            ),
+          ),
+        );
       }
     } on AuthException catch (e) {
-      setState(() => errorMessage = e.message);
-    } catch (e) {
-      setState(() => errorMessage = "An unexpected error occurred");
+      setState(() => _error = e.message);
+    } catch (_) {
+      setState(() => _error = 'An unexpected error occurred.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final Color primary = Colors.blue[900]!;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = isDark ? AppColors.darkPrimary : AppColors.lightPrimary;
+    final bg = isDark ? AppColors.darkBg : AppColors.lightBg;
+    final cardBg = isDark ? AppColors.darkCard : AppColors.lightCard;
+    final textPri = isDark ? AppColors.darkTextPri : AppColors.lightTextPri;
+    final textSec = isDark ? AppColors.darkTextSec : AppColors.lightTextSec;
+    final divider = isDark ? AppColors.darkDivider : AppColors.lightDivider;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFC),
+      backgroundColor: bg,
       body: SafeArea(
         child: Stack(
           children: [
             SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 30),
+              padding: const EdgeInsets.symmetric(horizontal: 28),
               child: Column(
                 children: [
-                  const SizedBox(height: 70),
-                  Image.asset('asset/logo.png', width: 220, height: 220),
-                  const SizedBox(height: 50),
-                  
-                  TextField(
-                    controller: emailController,
+                  const SizedBox(height: 60),
+
+                  // Logo
+                  Image.asset('asset/logo.png', width: 180, height: 180),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Welcome Back',
+                    style: GoogleFonts.inter(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      color: textPri,
+                    ),
+                  ),
+                  Text(
+                    'Sign in to continue',
+                    style: GoogleFonts.inter(fontSize: 14, color: textSec),
+                  ),
+
+                  const SizedBox(height: 40),
+
+                  // Email field
+                  _inputField(
+                    controller: _emailController,
+                    hint: 'Email Address',
+                    icon: Icons.email_outlined,
+                    primary: primary,
+                    cardBg: cardBg,
+                    textPri: textPri,
+                    textSec: textSec,
+                    divider: divider,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: InputDecoration(
-                      hintText: "Your Email",
-                      prefixIcon: Icon(Icons.email, color: primary),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(30)),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // Password field
+                  _inputField(
+                    controller: _passwordController,
+                    hint: 'Password',
+                    icon: Icons.lock_outline,
+                    primary: primary,
+                    cardBg: cardBg,
+                    textPri: textPri,
+                    textSec: textSec,
+                    divider: divider,
+                    obscure: _obscurePassword,
+                    suffix: IconButton(
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                        color: textSec,
+                        size: 20,
+                      ),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
-                  const SizedBox(height: 16),
 
-                  TextField(
-                    controller: passwordController,
-                    obscureText: true,
-                    decoration: InputDecoration(
-                      hintText: "Password",
-                      prefixIcon: Icon(Icons.lock, color: primary),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(30)),
+                  // Error message
+                  if (_error.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.darkError.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color: AppColors.darkError.withValues(alpha: 0.3)),
+                      ),
+                      child: Text(
+                        _error,
+                        style: GoogleFonts.inter(
+                            fontSize: 13, color: AppColors.darkError),
+                      ),
                     ),
-                  ),
-                  
-                  const SizedBox(height: 20),
-                  if (errorMessage.isNotEmpty)
-                    Text(errorMessage, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                  ],
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 28),
+
+                  // Sign In button
                   SizedBox(
                     width: double.infinity,
+                    height: 52,
                     child: ElevatedButton(
-                      onPressed: _isLoading ? null : signIn,
+                      onPressed: _isLoading ? null : _signIn,
                       style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                         backgroundColor: primary,
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                        elevation: 0,
                       ),
-                      child: const Text("Sign In", style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                  color: Colors.black, strokeWidth: 2.5))
+                          : Text('Sign In',
+                              style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w800, fontSize: 16)),
                     ),
                   ),
 
                   const SizedBox(height: 24),
+
+                  // Sign Up link
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text("Don't have an account? "),
+                      Text("Don't have an account? ",
+                          style: GoogleFonts.inter(
+                              fontSize: 14, color: textSec)),
                       GestureDetector(
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SignUpPage(users: widget.users))),
-                        child: Text("Sign Up", style: TextStyle(color: primary, fontWeight: FontWeight.bold)),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) =>
+                                  SignUpPage(users: widget.users)),
+                        ),
+                        child: Text('Sign Up',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              color: primary,
+                              fontWeight: FontWeight.w700,
+                            )),
                       ),
                     ],
                   ),
@@ -129,8 +230,49 @@ class _SignInPageState extends State<SignInPage> {
               ),
             ),
             if (_isLoading)
-              Container(color: Colors.black26, child: const Center(child: CircularProgressIndicator())),
+              Container(
+                color: Colors.black.withValues(alpha: 0.3),
+                child: Center(
+                    child: CircularProgressIndicator(color: primary)),
+              ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _inputField({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    required Color primary,
+    required Color cardBg,
+    required Color textPri,
+    required Color textSec,
+    required Color divider,
+    TextInputType keyboardType = TextInputType.text,
+    bool obscure = false,
+    Widget? suffix,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: divider),
+      ),
+      child: TextField(
+        controller: controller,
+        obscureText: obscure,
+        keyboardType: keyboardType,
+        style: GoogleFonts.inter(fontSize: 15, color: textPri),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: GoogleFonts.inter(color: textSec, fontSize: 14),
+          prefixIcon: Icon(icon, color: primary, size: 20),
+          suffixIcon: suffix,
+          border: InputBorder.none,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
       ),
     );

@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:offside/pages_add/add_league.dart';
 import 'package:offside/pages_navbar/analysis.dart';
 import 'package:offside/pages_navbar/matchs.dart';
 import 'package:offside/pages_navbar/players.dart';
 import 'package:offside/pages_navbar/profile.dart';
-import 'package:offside/pages_navbar/player_profile.dart';
 import 'package:offside/pages_navbar/notifications.dart';
 import 'package:offside/theme_provider.dart';
 
@@ -30,7 +28,7 @@ class _OffsideShellState extends State<OffsideShell>
     super.initState();
     _pages = [
       const MatchesPage(),
-      const AnalysisPage(),
+      AnalysisPage(userRole: widget.userRole),
       NotificationsPage(
           userRole: widget.userRole, currentUserEmail: widget.userName),
       const PlayersPage(),
@@ -102,7 +100,7 @@ class _OffsideShellState extends State<OffsideShell>
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.6 : 0.1),
+            color: Colors.black.withValues(alpha: isDark ? 0.6 : 0.1),
             blurRadius: 20,
             offset: const Offset(0, -4),
           ),
@@ -134,7 +132,7 @@ class _OffsideShellState extends State<OffsideShell>
         curve: Curves.easeInOut,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? primary.withOpacity(0.12) : Colors.transparent,
+          color: isSelected ? primary.withValues(alpha: 0.12) : Colors.transparent,
           borderRadius: BorderRadius.circular(14),
         ),
         child: Column(
@@ -151,7 +149,7 @@ class _OffsideShellState extends State<OffsideShell>
                   color: primary,
                   boxShadow: [
                     BoxShadow(
-                      color: primary.withOpacity(0.8),
+                      color: primary.withValues(alpha: 0.8),
                       blurRadius: 6,
                       spreadRadius: 1,
                     )

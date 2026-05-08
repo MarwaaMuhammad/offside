@@ -7,11 +7,11 @@ class AppColors {
   static const Color darkBg         = Color(0xFF121212);
   static const Color darkCard       = Color(0xFF1E1E1E);
   static const Color darkCardAlt    = Color(0xFF252525);
-  static const Color darkPrimary    = Color(0xFF00C853); // Green
+  static const Color darkPrimary    = Color(0xFF0066FF); // Dark Neon Blue
   static const Color darkSecondary  = Color(0xFF0288D1); // Blue
   static const Color darkAccent     = Color(0xFFFF6D00); // Orange
   static const Color darkError      = Color(0xFFEF5350);
-  static const Color darkSuccess    = Color(0xFF4CAF50);
+  static const Color darkSuccess    = Color(0xFF0066FF); // Dark Neon Blue
   static const Color darkTextPri    = Color(0xFFFFFFFF);
   static const Color darkTextSec    = Color(0xFFB0B0B0);
   static const Color darkDivider    = Color(0xFF2A2A2A);
@@ -20,11 +20,11 @@ class AppColors {
   // ── Light Mode ─────────────────────────────────────
   static const Color lightBg        = Color(0xFFF5F7FA);
   static const Color lightCard      = Color(0xFFFFFFFF);
-  static const Color lightPrimary   = Color(0xFF00A63E);
+  static const Color lightPrimary   = Color(0xFF0055CC); // Dark Neon Blue
   static const Color lightSecondary = Color(0xFF1E88E5);
   static const Color lightAccent    = Color(0xFFFF6D00);
   static const Color lightError     = Color(0xFFEF5350);
-  static const Color lightSuccess   = Color(0xFF4CAF50);
+  static const Color lightSuccess   = Color(0xFF0055CC); // Dark Neon Blue
   static const Color lightTextPri   = Color(0xFF1C1C1C);
   static const Color lightTextSec   = Color(0xFF6B7280);
   static const Color lightDivider   = Color(0xFFE5E7EB);

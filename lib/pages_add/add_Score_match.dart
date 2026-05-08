@@ -4,10 +4,9 @@ import 'package:offside/models/leage_model.dart';
 import 'package:offside/models/match_model.dart';
 import 'package:offside/models/player_model.dart';
 import 'package:offside/models/event_model.dart';
-// ── NEW ──────────────────────────────────────────────────────────────
 import 'package:offside/services/sync_service.dart';
 import 'package:offside/services/api_service.dart';
-// ─────────────────────────────────────────────────────────────────────
+import 'package:offside/theme_provider.dart';
 
 class AddScorePage extends StatefulWidget {
   final int matchIndex;
@@ -33,15 +32,12 @@ class _AddScorePageState extends State<AddScorePage> {
     league = leaguesBox.getAt(widget.leagueIndex)!;
   }
 
-  // ─────────────────────────────────────────────────────────────────
-  //  Record any event in the match
-  // ─────────────────────────────────────────────────────────────────
   void _addEvent(Match2 match, bool isHome, String type, Player player,
       {String? assist}) {
     final event = Event(
       type: type,
       player: player.name,
-      minute: DateTime.now().minute, // You can modify this to allow manual minute input
+      minute: DateTime.now().minute,
       assist: assist,
     );
 
@@ -55,9 +51,6 @@ class _AddScorePageState extends State<AddScorePage> {
     setState(() {});
   }
 
-  // ─────────────────────────────────────────────────────────────────
-  //  Finish match → save locally + sync to backend
-  // ─────────────────────────────────────────────────────────────────
   Future<void> _finishMatch(Match2 match) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -80,14 +73,13 @@ class _AddScorePageState extends State<AddScorePage> {
     if (confirm != true) return;
 
     try {
-      // Sync the final result to the backend
       await SyncService.syncMatchResult(match, league, isFinished: true);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("✅ Match result synced to backend!"),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.darkPrimary,
           ),
         );
         Navigator.pop(context);
@@ -114,7 +106,9 @@ class _AddScorePageState extends State<AddScorePage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      backgroundColor: Colors.grey[100],
+      backgroundColor: Theme.of(context).brightness == Brightness.dark 
+          ? AppColors.darkBg 
+          : Colors.grey[100],
       builder: (context) {
         return Container(
           padding: const EdgeInsets.all(16),
@@ -137,7 +131,7 @@ class _AddScorePageState extends State<AddScorePage> {
                           borderRadius: BorderRadius.circular(12)),
                       elevation: 2,
                       child: ListTile(
-                        leading: const Icon(Icons.person, color: Colors.blue),
+                        leading: const Icon(Icons.person, color: AppColors.darkSecondary),
                         title: Text(p.name),
                         subtitle: Text(
                           "Assists: ${p.assists} | Passes: ${p.passes}",
@@ -164,7 +158,7 @@ class _AddScorePageState extends State<AddScorePage> {
                 child: TextButton.icon(
                   style: TextButton.styleFrom(foregroundColor: Colors.red),
                   onPressed: () {
-                    _addEvent(match, isHome, "Goal", scorer); // Without Assist
+                    _addEvent(match, isHome, "Goal", scorer);
                     Navigator.pop(context);
                   },
                   icon: const Icon(Icons.close),
@@ -183,7 +177,7 @@ class _AddScorePageState extends State<AddScorePage> {
       {
         "label": "Goal",
         "icon": Icons.sports_soccer,
-        "color": Colors.green,
+        "color": AppColors.darkPrimary,
         "action": () {
           setState(() {
             if (isHome) {
@@ -254,7 +248,7 @@ class _AddScorePageState extends State<AddScorePage> {
       {
         "label": "Corner Kick",
         "icon": Icons.sports_soccer_outlined,
-        "color": Colors.teal,
+        "color": AppColors.darkPrimary,
         "action": () {
           _addEvent(match, isHome, "Corner Kick", player);
         }
@@ -274,11 +268,13 @@ class _AddScorePageState extends State<AddScorePage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      backgroundColor: Colors.grey[100],
+      backgroundColor: Theme.of(context).brightness == Brightness.dark 
+          ? AppColors.darkBg 
+          : Colors.grey[100],
       builder: (context) {
         return Container(
           padding: const EdgeInsets.all(16),
-          height: MediaQuery.of(context).size.height * 0.5, // Half the screen
+          height: MediaQuery.of(context).size.height * 0.5,
           child: GridView.count(
             crossAxisCount: 3,
             children: events.map((e) {
@@ -318,25 +314,25 @@ class _AddScorePageState extends State<AddScorePage> {
   @override
   Widget build(BuildContext context) {
     final match = league.matches[widget.matchIndex];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = isDark ? AppColors.darkPrimary : AppColors.lightPrimary;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text("Match Details"),
         actions: [
-          // ── NEW: Finish Match button ─────────────────────────────
           TextButton.icon(
             onPressed: () => _finishMatch(match),
-            icon: const Icon(Icons.check_circle, color: Colors.green),
-            label: const Text(
+            icon: Icon(Icons.check_circle, color: primary),
+            label: Text(
               "Finish",
-              style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+              style: TextStyle(color: primary, fontWeight: FontWeight.bold),
             ),
           ),
         ],
       ),
       body: Column(
         children: [
-          // Match details header
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: Row(
@@ -365,8 +361,6 @@ class _AddScorePageState extends State<AddScorePage> {
             ),
           ),
           const Divider(thickness: 2),
-
-          // Players
           Expanded(
             child: Row(
               children: [

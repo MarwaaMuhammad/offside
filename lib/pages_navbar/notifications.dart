@@ -1,7 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:intl/intl.dart';
 import 'package:offside/models/invitation_model.dart';
 import 'package:offside/models/leage_model.dart';
 import 'package:offside/models/player_model.dart';
@@ -185,14 +184,14 @@ class _NotificationsPageState extends State<NotificationsPage>
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isPending
-              ? statusColor.withOpacity(0.4)
+              ? statusColor.withValues(alpha: 0.4)
               : (isDark ? AppColors.darkDivider : AppColors.lightDivider),
         ),
         // Left accent bar for pending
         boxShadow: isPending
             ? [
                 BoxShadow(
-                  color: statusColor.withOpacity(0.1),
+                  color: statusColor.withValues(alpha: 0.1),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 )
@@ -223,7 +222,7 @@ class _NotificationsPageState extends State<NotificationsPage>
                             width: 38,
                             height: 38,
                             decoration: BoxDecoration(
-                              color: statusColor.withOpacity(0.12),
+                              color: statusColor.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Icon(
@@ -314,7 +313,7 @@ class _NotificationsPageState extends State<NotificationsPage>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
@@ -363,7 +362,7 @@ class _NotificationsPageState extends State<NotificationsPage>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.notifications_off_outlined,
-              size: 64, color: textSec.withOpacity(0.3)),
+              size: 64, color: textSec.withValues(alpha: 0.3)),
           const SizedBox(height: 16),
           Text(
             'No notifications yet',
