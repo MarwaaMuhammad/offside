@@ -11,19 +11,51 @@ class PlayerStats extends HiveObject {
   String playerId;
 
   @HiveField(2)
-  String? heatmapImageUrl;
+  String? matchId;
 
   @HiveField(3)
-  String position;
+  double? topSpeed;
 
   @HiveField(4)
-  int appearanceCount;
+  double? totalDistance;
+
+  @HiveField(5)
+  int? goals;
+
+  @HiveField(6)
+  int? assists;
+
+  @HiveField(7)
+  int? yellowCards;
+
+  @HiveField(8)
+  int? redCards;
+
+  @HiveField(9)
+  bool? isMvp;
+
+  @HiveField(10)
+  double? acquisition;
+
+  @HiveField(11)
+  Map<dynamic, dynamic>? actionsDetected;
+
+  @HiveField(12)
+  String? heatmapImageUrl;
 
   PlayerStats({
     this.backendId,
     required this.playerId,
+    this.matchId,
+    this.topSpeed = 0.0,
+    this.totalDistance = 0.0,
+    this.goals = 0,
+    this.assists = 0,
+    this.yellowCards = 0,
+    this.redCards = 0,
+    this.isMvp = false,
+    this.acquisition = 0.0,
+    this.actionsDetected,
     this.heatmapImageUrl,
-    required this.position,
-    this.appearanceCount = 0,
   });
 }

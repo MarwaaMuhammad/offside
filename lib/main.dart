@@ -40,7 +40,10 @@ Future<void> main() async {
   
   await Hive.openBox<League>('leagues');
   await Hive.openBox<Invitation>('invitations'); 
-  await Hive.openBox<Player>('players'); // Open players box
+  await Hive.openBox<Player>('players'); 
+  await Hive.openBox<MatchStats>('match_stats');
+  await Hive.openBox<PlayerStats>('player_stats');
+  await Hive.openBox<TeamStats>('team_stats');
 
   runApp(const MyApp());
 }

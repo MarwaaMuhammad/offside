@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ApiService {
   static const String baseUrl = 'https://gsvowvzdxphlguclawur.supabase.co/rest/v1';
@@ -41,7 +43,101 @@ class ApiService {
     }
   }
 
-  // 1. Tournament Creation & Fetching
+  static dynamic _handleListResponse(http.Response res) {
+    print("📡 [API List Response] ${res.statusCode}");
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      return jsonDecode(res.body);
+    } else {
+      throw ApiException(statusCode: res.statusCode, message: res.body);
+    }
+  }
+
+  // --- USER & PLAYER DATA FETCHING ---
+
+  /// Fetches user/player profile data using the Supabase client for better reliability and RLS support.
+  static Future<Map<String, dynamic>?> fetchUserData(String email) async {
+    print("🔍 [API] Fetching profile for: $email");
+    
+    try {
+      // 1. Check PLAYERS table
+      final playerRes = await Supabase.instance.client
+          .from('PLAYERS')
+          .select()
+          .ilike('email', email.trim())
+          .maybeSingle();
+      
+      if (playerRes != null) {
+        final data = Map<String, dynamic>.from(playerRes);
+        data['role'] = 'player';
+        print("✅ [API] Found player profile");
+        return data;
+      }
+
+      // 2. Check USERS table
+      final userRes = await Supabase.instance.client
+          .from('USERS')
+          .select()
+          .ilike('email', email.trim())
+          .maybeSingle();
+
+      if (userRes != null) {
+        final data = Map<String, dynamic>.from(userRes);
+        data['role'] = 'user';
+        print("✅ [API] Found user profile");
+        return data;
+      }
+      
+      print("⚠️ [API] No profile found in PLAYERS or USERS for $email");
+      return null;
+    } catch (e) {
+      print("❌ [API] fetchUserData critical error: $e");
+      rethrow;
+    }
+  }
+
+  static Future<void> updateUserProfile({
+    required String email,
+    required String role,
+    required Map<String, dynamic> updates,
+  }) async {
+    final table = role == 'player' ? 'PLAYERS' : 'USERS';
+    
+    // Use Supabase client for updates - more reliable than raw HTTP
+    await Supabase.instance.client
+        .from(table)
+        .update(updates)
+        .ilike('email', email.trim());
+    
+    print("✅ [API] Profile updated successfully in $table");
+  }
+
+  // ⚠️ Change 'profile-images' below to match your Supabase Storage bucket name exactly.
+  static const String _storageBucket = 'profile-images';
+
+  static Future<String?> uploadProfileImage(File file, String userId) async {
+    final fileName = '$userId-${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final path = 'profile_images/$fileName';
+    
+    try {
+      await Supabase.instance.client.storage
+          .from(_storageBucket)
+          .upload(path, file, fileOptions: const FileOptions(upsert: true));
+
+      final imageUrl = Supabase.instance.client.storage
+          .from(_storageBucket)
+          .getPublicUrl(path);
+      
+      print("✅ [API] Image uploaded: $imageUrl");
+      return imageUrl;
+    } catch (e) {
+      print("❌ [API] Image upload error: $e");
+      // Rethrow so the UI can show a meaningful error message
+      rethrow;
+    }
+  }
+
+  // --- TOURNAMENTS & LEAGUES ---
+
   static Future<Map<String, dynamic>> createTournament({
     required String name, 
     required DateTime startDate, 
@@ -61,11 +157,11 @@ class ApiService {
 
   static Future<List<dynamic>> fetchTournaments() async {
     final res = await http.get(_uri('TOURNAMENTS'), headers: _headers);
-    if (res.statusCode == 200) return jsonDecode(res.body);
-    throw ApiException(statusCode: res.statusCode, message: res.body);
+    return _handleListResponse(res);
   }
 
-  // 2. Team Creation & Fetching
+  // --- TEAMS ---
+
   static Future<Map<String, dynamic>> createTeam({
     required String name, 
     required String primaryColor, 
@@ -87,11 +183,11 @@ class ApiService {
 
   static Future<List<dynamic>> fetchTeams() async {
     final res = await http.get(_uri('TEAMS'), headers: _headers);
-    if (res.statusCode == 200) return jsonDecode(res.body);
-    throw ApiException(statusCode: res.statusCode, message: res.body);
+    return _handleListResponse(res);
   }
 
-  // 3. Match Creation & Fetching
+  // --- MATCHES ---
+
   static Future<Map<String, dynamic>> createMatch({
     required dynamic tournamentId, 
     required dynamic homeTeamId, 
@@ -115,11 +211,11 @@ class ApiService {
 
   static Future<List<dynamic>> fetchMatches() async {
     final res = await http.get(_uri('MATCHES'), headers: _headers);
-    if (res.statusCode == 200) return jsonDecode(res.body);
-    throw ApiException(statusCode: res.statusCode, message: res.body);
+    return _handleListResponse(res);
   }
 
-  // 4. User Creation
+  // --- USERS ---
+
   static Future<Map<String, dynamic>> createUser({
     required String name, 
     required String email, 
@@ -139,14 +235,16 @@ class ApiService {
     return _handleResponse(res);
   }
 
-  // 5. Submit Team Stats
-  static Future<Map<String, dynamic>> submitTeamStats({
+  // --- STATS ---
+
+  static Future<Map<String, dynamic>> submitTeamMatchStats({
     required dynamic matchId, 
     required dynamic teamId, 
     required int goals, 
     required int passes, 
     required int fouls, 
-    required int corners
+    required int corners,
+    double acquisitionAvg = 0.0,
   }) async {
     final res = await http.post(
       _uri('TEAM_MATCH_STATS'), 
@@ -157,14 +255,19 @@ class ApiService {
         'goals': goals, 
         'passes': passes, 
         'foul': fouls, 
-        'corner': corners
+        'corner': corners,
+        'acquisition_avg': acquisitionAvg,
       })
     );
     return _handleResponse(res);
   }
 
-  // 6. Submit Player Stats
-  static Future<Map<String, dynamic>> submitPlayerStats({
+  static Future<List<dynamic>> fetchTeamMatchStats() async {
+    final res = await http.get(_uri('TEAM_MATCH_STATS'), headers: _headers);
+    return _handleListResponse(res);
+  }
+
+  static Future<Map<String, dynamic>> submitPlayerMatchStats({
     required dynamic matchId, 
     required dynamic playerId, 
     required int goals, 
@@ -172,7 +275,11 @@ class ApiService {
     required int yellowCard, 
     required int redCard, 
     required double topSpeed, 
-    required double totalDistance
+    required double totalDistance,
+    bool isMvp = false,
+    double acquisition = 0.0,
+    String? heatmapImageUrl,
+    Map<String, dynamic>? actionsDetected,
   }) async {
     final res = await http.post(
       _uri('PLAYER_MATCH_STATS'), 
@@ -185,16 +292,26 @@ class ApiService {
         'yellow_card': yellowCard, 
         'red_card': redCard, 
         'top_speed': topSpeed, 
-        'total_distance': totalDistance
+        'total_distance': totalDistance,
+        'is_mvp': isMvp,
+        'acquisition': acquisition,
+        'heatmap_image_url': heatmapImageUrl,
+        'actions_detected': actionsDetected,
       })
     );
     return _handleResponse(res);
   }
 
+  static Future<List<dynamic>> fetchPlayerMatchStats() async {
+    final res = await http.get(_uri('PLAYER_MATCH_STATS'), headers: _headers);
+    return _handleListResponse(res);
+  }
+
+  // --- PLAYERS ---
+
   static Future<List<dynamic>> getAllPlayers() async {
     final res = await http.get(_uri('PLAYERS'), headers: _headers);
-    if (res.statusCode == 200) return jsonDecode(res.body);
-    throw ApiException(statusCode: res.statusCode, message: res.body);
+    return _handleListResponse(res);
   }
 
   static Future<Map<String, dynamic>> createPlayer({
@@ -253,6 +370,8 @@ class ApiService {
       return false;
     }
   }
+
+  // --- INVITATIONS ---
 
   static Future<Map<String, dynamic>> sendInvitation({
     required dynamic teamId,

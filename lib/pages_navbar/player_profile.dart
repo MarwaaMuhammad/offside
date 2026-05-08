@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:offside/models/leage_model.dart';
 import 'package:offside/models/player_model.dart';
 import 'package:offside/models/team_model.dart';
+import 'package:offside/services/sync_service.dart';
 
 class PlayerProfilePage extends StatefulWidget {
   final String playerName;
@@ -16,8 +17,16 @@ class PlayerProfilePage extends StatefulWidget {
 }
 
 class _PlayerProfilePageState extends State<PlayerProfilePage> {
+  final playerBox = Hive.box<Player>('players');
   final leaguesBox = Hive.box<League>('leagues');
   final ImagePicker _picker = ImagePicker();
+  bool _isSyncing = false;
+
+  Future<void> _refreshData() async {
+    setState(() => _isSyncing = true);
+    await SyncService.fetchAllLeaguesFromBackend();
+    if (mounted) setState(() => _isSyncing = false);
+  }
 
   Future<void> _pickImage(Player player, ImageSource source) async {
     final XFile? image = await _picker.pickImage(source: source);
@@ -29,91 +38,51 @@ class _PlayerProfilePageState extends State<PlayerProfilePage> {
     }
   }
 
-  void _showEditDialog(Player player) {
-    final TextEditingController heightController = TextEditingController(text: player.height?.toString());
-    final TextEditingController weightController = TextEditingController(text: player.weight?.toString());
-    final TextEditingController nationalityController = TextEditingController(text: player.nationality);
-    String selectedPos = player.position;
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Edit Profile Data"),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: nationalityController, decoration: const InputDecoration(labelText: "Nationality")),
-              TextField(controller: heightController, decoration: const InputDecoration(labelText: "Height (cm)"), keyboardType: TextInputType.number),
-              TextField(controller: weightController, decoration: const InputDecoration(labelText: "Weight (kg)"), keyboardType: TextInputType.number),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                value: selectedPos,
-                items: ["Goalkeeper", "Defender", "Midfielder", "Forward"].map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
-                onChanged: (val) => selectedPos = val!,
-                decoration: const InputDecoration(labelText: "Position"),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                player.nationality = nationalityController.text;
-                player.height = double.tryParse(heightController.text);
-                player.weight = double.tryParse(weightController.text);
-                player.position = selectedPos;
-                player.save();
-              });
-              Navigator.pop(context);
-            },
-            child: const Text("Save"),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final Color primary = const Color(0xFF16246E);
-
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
         title: const Text("Player Dashboard"),
         backgroundColor: Colors.grey.shade100,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.blue),
-            onPressed: () => setState(() {}),
-          )
+          if (_isSyncing)
+            const Center(child: Padding(padding: EdgeInsets.all(16.0), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))))
+          else
+            IconButton(
+              icon: const Icon(Icons.refresh, color: Colors.blue),
+              onPressed: _refreshData,
+            )
         ],
       ),
       body: ValueListenableBuilder(
-        valueListenable: leaguesBox.listenable(),
-        builder: (context, Box<League> box, _) {
-          Player? currentPlayer;
-          List<Team> joinedTeams = [];
-          List<League> participatedLeagues = [];
-
-          for (var league in box.values) {
-            bool playedInLeague = false;
-            for (var team in league.teams) {
-              final p = team.players.where((player) => player.name == widget.playerName);
-              if (p.isNotEmpty) {
-                currentPlayer = p.first;
-                joinedTeams.add(team);
-                playedInLeague = true;
-              }
-            }
-            if (playedInLeague) participatedLeagues.add(league);
+        valueListenable: playerBox.listenable(),
+        builder: (context, Box<Player> box, _) {
+          final players = box.values.where((p) => p.name == widget.playerName).toList();
+          
+          if (players.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text("Player profile not found."),
+                  const SizedBox(height: 16),
+                  ElevatedButton(onPressed: _refreshData, child: const Text("Sync Data")),
+                ],
+              ),
+            );
           }
 
-          if (currentPlayer == null) {
-            return const Center(child: Text("Register as a player in a team to see your profile."));
+          final currentPlayer = players.first;
+          
+          // Find teams and leagues for this player from leaguesBox
+          List<Team> joinedTeams = [];
+          for (var league in leaguesBox.values) {
+            for (var team in league.teams) {
+              if (team.players.any((p) => p.name == widget.playerName)) {
+                joinedTeams.add(team);
+              }
+            }
           }
 
           return SingleChildScrollView(
@@ -121,20 +90,9 @@ class _PlayerProfilePageState extends State<PlayerProfilePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Profile Header with Image Upload
                 _buildHeader(currentPlayer),
-                const SizedBox(height: 20),
-                
-                // Edit Button
-                Center(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _showEditDialog(currentPlayer!),
-                    icon: const Icon(Icons.edit),
-                    label: const Text("Edit Personal Info"),
-                  ),
-                ),
-                
                 const SizedBox(height: 25),
+                
                 const Text("Performance Overview", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 15),
                 GridView.count(
@@ -143,24 +101,59 @@ class _PlayerProfilePageState extends State<PlayerProfilePage> {
                   crossAxisCount: 2,
                   crossAxisSpacing: 15,
                   mainAxisSpacing: 15,
-                  childAspectRatio: 2.5,
+                  childAspectRatio: 2.2,
                   children: [
-                    _statCard("Goals", currentPlayer.goals.toString(), Icons.sports_soccer),
-                    _statCard("Assists", currentPlayer.assists.toString(), Icons.assistant),
-                    _statCard("Matches", currentPlayer.appearances.toString(), Icons.event),
-                    _statCard("Passes", currentPlayer.passes.toString(), Icons.swap_horiz),
+                    _statCard("Total Goals", "${currentPlayer.goals}", Icons.sports_soccer, Colors.green),
+                    _statCard("Total Assists", "${currentPlayer.assists}", Icons.assistant, Colors.orange),
+                    _statCard("Appearances", "${currentPlayer.appearances}", Icons.event, Colors.blue),
+                    _statCard("Top Speed", "${currentPlayer.highestSpeed?.toStringAsFixed(1) ?? '0.0'} km/h", Icons.speed, Colors.red),
+                    _statCard("Distance", "${(currentPlayer.totalDistance ?? 0 / 1000).toStringAsFixed(2)} km", Icons.directions_run, Colors.purple),
+                    _statCard("Cards", "${currentPlayer.yellowCards}Y / ${currentPlayer.redCards}R", Icons.style, Colors.amber),
                   ],
                 ),
+                
                 const SizedBox(height: 30),
                 const Text("Teams & Organizations", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 10),
-                ...joinedTeams.map((team) => Card(
-                  child: ListTile(
-                    leading: Image.asset(team.logo, width: 35),
-                    title: Text(team.name),
-                    subtitle: const Text("Member"),
+                if (joinedTeams.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: Text("Not assigned to any team yet.", style: TextStyle(color: Colors.grey)),
+                  )
+                else
+                  ...joinedTeams.map((team) => Card(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    child: ListTile(
+                      leading: Image.asset(team.logo, width: 35),
+                      title: Text(team.name),
+                      subtitle: Text(team.players.any((p) => p.name == widget.playerName) ? "Active Member" : ""),
+                    ),
+                  )),
+                
+                const SizedBox(height: 30),
+                // Heatmap Placeholder
+                const Text("Recent Performance Heatmap", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 15),
+                Container(
+                  height: 200,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    image: const DecorationImage(
+                      image: AssetImage('asset/heatmap_placeholder.png'), // Ensure you have this or use a network image
+                      fit: BoxFit.cover,
+                    ),
                   ),
-                )),
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      color: Colors.black54,
+                      child: const Text("Visual Activity Data", style: TextStyle(color: Colors.white)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 80),
               ],
             ),
           );
@@ -170,9 +163,14 @@ class _PlayerProfilePageState extends State<PlayerProfilePage> {
   }
 
   Widget _buildHeader(Player player) {
+    const Color darkBlue = Color(0xFF16246E);
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: const Color(0xFF16246E), borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [darkBlue, Color(0xFF0D1956)]),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: darkBlue.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 5))],
+      ),
       child: Row(
         children: [
           Stack(
@@ -207,9 +205,10 @@ class _PlayerProfilePageState extends State<PlayerProfilePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(player.name, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-                Text(player.position, style: const TextStyle(color: Colors.white70)),
+                Text("${player.position} • Jersey #${player.number}", style: const TextStyle(color: Colors.white70)),
                 const SizedBox(height: 5),
-                Text("${player.height ?? 0}cm | ${player.weight ?? 0}kg", style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                Text("${player.nationality}", style: const TextStyle(color: Colors.white54, fontSize: 14)),
+                Text("${player.height?.toInt() ?? 0}cm | ${player.weight?.toInt() ?? 0}kg", style: const TextStyle(color: Colors.white54, fontSize: 12)),
               ],
             ),
           ),
@@ -232,18 +231,28 @@ class _PlayerProfilePageState extends State<PlayerProfilePage> {
     );
   }
 
-  Widget _statCard(String label, String value, IconData icon) {
+  Widget _statCard(String label, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)]),
+      decoration: BoxDecoration(
+        color: Colors.white, 
+        borderRadius: BorderRadius.circular(15), 
+        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4, offset: const Offset(0, 2))],
+      ),
       child: Row(
         children: [
-          Icon(icon, color: Colors.blue[900], size: 20),
+          Icon(icon, color: color, size: 24),
           const SizedBox(width: 10),
-          Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
-            Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-          ]),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center, 
+              crossAxisAlignment: CrossAxisAlignment.start, 
+              children: [
+                Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey), overflow: TextOverflow.ellipsis),
+              ]
+            ),
+          ),
         ],
       ),
     );

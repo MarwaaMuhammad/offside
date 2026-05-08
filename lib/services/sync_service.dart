@@ -3,6 +3,8 @@ import 'package:offside/models/leage_model.dart';
 import 'package:offside/models/match_model.dart';
 import 'package:offside/models/team_model.dart';
 import 'package:offside/models/player_model.dart';
+import 'package:offside/models/match_stats_model.dart';
+import 'package:offside/models/player_stats_model.dart';
 import 'api_service.dart';
 
 class SyncService {
@@ -15,21 +17,28 @@ class SyncService {
       final teamsJson = await ApiService.fetchTeams() as List<dynamic>;
       final matchesJson = await ApiService.fetchMatches() as List<dynamic>;
       final playersJson = await ApiService.getAllPlayers() as List<dynamic>;
+      final playerStatsJson = await ApiService.fetchPlayerMatchStats() as List<dynamic>;
+      final teamStatsJson = await ApiService.fetchTeamMatchStats() as List<dynamic>;
 
       print("📊 [Sync] Data received: ${tournamentsJson.length} Tournaments, ${teamsJson.length} Teams, ${playersJson.length} Players");
 
       final leagueBox = Hive.box<League>('leagues');
       final playerBox = Hive.box<Player>('players');
+      final matchStatsBox = Hive.box<MatchStats>('match_stats');
+      final playerStatsBox = Hive.box<PlayerStats>('player_stats');
       
       await leagueBox.clear();
       await playerBox.clear();
+      await matchStatsBox.clear();
+      await playerStatsBox.clear();
 
-      // 1. Process all players and map them to teams efficiently
+      // 1. Process all players and calculate aggregate stats from PLAYER_MATCH_STATS
       Map<String, List<Player>> teamPlayersMap = {};
+      Map<String, Player> playerMap = {};
+      
       for (var pJson in playersJson) {
         final pId = (pJson['player_id'] ?? pJson['id']).toString();
         
-        // Use exactly 'jersey_number' as seen in user's Supabase screenshot
         int jNumber = 0;
         final rawNumber = pJson['jersey_number'] ?? pJson['number'];
         if (rawNumber != null) {
@@ -42,6 +51,44 @@ class SyncService {
           }
         }
 
+        // Calculate aggregate stats for player from playerStatsJson
+        int goals = 0;
+        int assists = 0;
+        int appearances = 0;
+        int yellowCards = 0;
+        int redCards = 0;
+        double maxSpeed = 0.0;
+        double totalDist = 0.0;
+
+        final pStats = playerStatsJson.where((s) => s['player_id']?.toString() == pId);
+        for (var s in pStats) {
+          appearances++;
+          goals += (s['goals'] as num?)?.toInt() ?? 0;
+          assists += (s['assists'] as num?)?.toInt() ?? 0;
+          yellowCards += (s['yellow_card'] as num?)?.toInt() ?? 0;
+          redCards += (s['red_card'] as num?)?.toInt() ?? 0;
+          double speed = (s['top_speed'] as num?)?.toDouble() ?? 0.0;
+          if (speed > maxSpeed) maxSpeed = speed;
+          totalDist += (s['total_distance'] as num?)?.toDouble() ?? 0.0;
+
+          // Store individual match stats for deep analysis
+          await playerStatsBox.add(PlayerStats(
+            backendId: (s['player_stat_id'] ?? s['id']).toString(),
+            playerId: pId,
+            matchId: s['match_id']?.toString(),
+            topSpeed: (s['top_speed'] as num?)?.toDouble() ?? 0.0,
+            totalDistance: (s['total_distance'] as num?)?.toDouble() ?? 0.0,
+            goals: (s['goals'] as num?)?.toInt() ?? 0,
+            assists: (s['assists'] as num?)?.toInt() ?? 0,
+            yellowCards: (s['yellow_card'] as num?)?.toInt() ?? 0,
+            redCards: (s['red_card'] as num?)?.toInt() ?? 0,
+            isMvp: s['is_mvp'] ?? false,
+            acquisition: (s['acquisition'] as num?)?.toDouble() ?? 0.0,
+            actionsDetected: s['actions_detected'] is Map ? s['actions_detected'] : null,
+            heatmapImageUrl: s['heatmap_image_url'],
+          ));
+        }
+
         final player = Player(
           name: pJson['full_name'] ?? "Unknown",
           position: pJson['position'] ?? "N/A",
@@ -51,10 +98,18 @@ class SyncService {
           height: (pJson['height'] as num?)?.toDouble(),
           weight: (pJson['weight'] as num?)?.toDouble(),
           backendId: pId,
-          image: pJson['image_url'], 
+          image: pJson['image_url'],
+          goals: goals,
+          assists: assists,
+          appearances: appearances,
+          yellowCards: yellowCards,
+          redCards: redCards,
+          highestSpeed: maxSpeed,
+          totalDistance: totalDist,
         );
         
         await playerBox.add(player);
+        playerMap[pId] = player;
         
         final tId = pJson['team_id']?.toString();
         if (tId != null) {
@@ -62,7 +117,7 @@ class SyncService {
         }
       }
 
-      // 2. Map Teams using the teamPlayersMap
+      // 2. Map Teams
       Map<String, Team> teamMap = {};
       for (var tJson in teamsJson) {
         String tId = (tJson['team_id'] ?? tJson['id']).toString();
@@ -70,7 +125,7 @@ class SyncService {
 
         final team = Team(
           name: tJson['team_name'] ?? "Unknown Team",
-          logo: "asset/Teams_Logo/1.png",
+          logo: "asset/Teams_Logo/1.png", // Fallback logo
           players: teamPlayers,
           primaryColor: tJson['primary_tshirt_colors'],
           secondaryColor: tJson['secondary _tshirt_colors'],
@@ -80,7 +135,7 @@ class SyncService {
         teamMap[tId] = team;
       }
 
-      // 3. Map Matches to Tournaments
+      // 3. Map Matches and use TEAM_MATCH_STATS for scores
       for (var tourJson in tournamentsJson) {
         String tourId = (tourJson['tournament_id'] ?? tourJson['id']).toString();
         
@@ -93,18 +148,52 @@ class SyncService {
         for (var mJson in relatedMatches) {
           String? hId = mJson['home_team_id']?.toString();
           String? aId = mJson['away_team_id']?.toString();
+          String mId = (mJson['match_id'] ?? mJson['id']).toString();
           
           if (hId != null && aId != null && teamMap.containsKey(hId) && teamMap.containsKey(aId)) {
+            // Check TEAM_MATCH_STATS for the actual result
+            final hStats = teamStatsJson.firstWhere((s) => s['match_id']?.toString() == mId && s['team_id']?.toString() == hId, orElse: () => null);
+            final aStats = teamStatsJson.firstWhere((s) => s['match_id']?.toString() == mId && s['team_id']?.toString() == aId, orElse: () => null);
+
+            // Match Result Logic: Prefer TEAM_MATCH_STATS, fallback to MATCHES columns
+            int? homeScore = hStats != null ? (hStats['goals'] as num?)?.toInt() : (mJson['home_score'] as num?)?.toInt();
+            int? awayScore = aStats != null ? (aStats['goals'] as num?)?.toInt() : (mJson['away_score'] as num?)?.toInt();
+
             final match = Match2(
               homeTeam: teamMap[hId]!,
               awayTeam: teamMap[aId]!,
               date: DateTime.parse(mJson['match_date']),
-              backendId: (mJson['match_id'] ?? mJson['id']).toString(),
+              backendId: mId,
               videoUrl: mJson['video_url'],
-              homeTeamScore: mJson['home_score'] ?? 0,
-              awayTeamScore: mJson['away_score'] ?? 0,
+              homeTeamScore: homeScore,
+              awayTeamScore: awayScore,
             );
             leagueMatches.add(match);
+
+            // Store Team Match Stats
+            if (hStats != null) {
+              await matchStatsBox.add(MatchStats(
+                matchId: mId,
+                teamId: hId,
+                goalCount: (hStats['goals'] as num?)?.toInt() ?? 0,
+                passesCount: (hStats['passes'] as num?)?.toInt() ?? 0,
+                foulCount: (hStats['foul'] as num?)?.toInt() ?? 0,
+                cornerCount: (hStats['corner'] as num?)?.toInt() ?? 0,
+                acquisitionAvg: (hStats['acquisition_avg'] as num?)?.toDouble() ?? 0.0,
+              ));
+            }
+
+            if (aStats != null) {
+              await matchStatsBox.add(MatchStats(
+                matchId: mId,
+                teamId: aId,
+                goalCount: (aStats['goals'] as num?)?.toInt() ?? 0,
+                passesCount: (aStats['passes'] as num?)?.toInt() ?? 0,
+                foulCount: (aStats['foul'] as num?)?.toInt() ?? 0,
+                cornerCount: (aStats['corner'] as num?)?.toInt() ?? 0,
+                acquisitionAvg: (aStats['acquisition_avg'] as num?)?.toDouble() ?? 0.0,
+              ));
+            }
             
             if (addedTeamIds.add(hId)) leagueTeams.add(teamMap[hId]!);
             if (addedTeamIds.add(aId)) leagueTeams.add(teamMap[aId]!);
@@ -123,7 +212,7 @@ class SyncService {
         
         await leagueBox.add(league);
       }
-      print("🏁 [Sync] Success! Check your app now.");
+      print("🏁 [Sync] Success! Statistics updated.");
     } catch (e) {
       print("❌ [Sync] Critical Error: $e");
     }
@@ -158,16 +247,12 @@ class SyncService {
         for (final player in team.players) {
           try {
             if (player.backendId != null) {
-              // PLAYER EXISTS -> UPDATE JERSEY AND TEAM
-              print("🔄 [Sync] Updating existing player: ${player.name} (Jersey: #${player.number})");
               await ApiService.updatePlayer(
                 playerId: player.backendId!,
                 jerseyNumber: player.number,
                 teamId: team.backendId,
               );
             } else {
-              // NEW PLAYER -> CREATE
-              print("🆕 [Sync] Creating new player: ${player.name}");
               final remotePlayer = await ApiService.createPlayer(
                 fullName: player.name,
                 jerseyNumber: player.number,
@@ -212,7 +297,7 @@ class SyncService {
     if (match.backendId == null) return;
     try {
       if (match.homeTeam.backendId != null) {
-        await ApiService.submitTeamStats(
+        await ApiService.submitTeamMatchStats(
           matchId: match.backendId!,
           teamId: match.homeTeam.backendId!,
           goals: match.homeTeamScore ?? 0,
@@ -220,7 +305,7 @@ class SyncService {
         );
       }
       if (match.awayTeam.backendId != null) {
-        await ApiService.submitTeamStats(
+        await ApiService.submitTeamMatchStats(
           matchId: match.backendId!,
           teamId: match.awayTeam.backendId!,
           goals: match.awayTeamScore ?? 0,

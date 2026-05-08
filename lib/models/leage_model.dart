@@ -50,7 +50,7 @@ class League extends HiveObject {
   });
 
   // ─────────────────────────────────────────────────
-  //  Standings calculation (unchanged)
+  //  Standings calculation
   // ─────────────────────────────────────────────────
   void updateStandings() {
     // Reset all stats first
@@ -62,34 +62,29 @@ class League extends HiveObject {
       t.goalsFor = 0;
       t.goalsAgainst = 0;
       t.points = 0;
+      t.diff_goals = 0;
     }
 
     // Iterate over matches and calculate
     for (var m in matches) {
+      // Check if match has scores (is finished)
       if (m.homeTeamScore == null || m.awayTeamScore == null) {
-        continue; // If the match hasn't been played, skip it
+        continue; 
       }
 
+      // Use backendId if available, otherwise name
       final home = teams.firstWhere(
-        (t) => t.name == m.homeTeam.name,
-        orElse: () =>
-            Team(name: m.homeTeam.name, players: [], logo: m.homeTeam.logo),
+        (t) => (t.backendId != null && t.backendId == m.homeTeam.backendId) || t.name == m.homeTeam.name,
+        orElse: () => m.homeTeam,
       );
 
       final away = teams.firstWhere(
-        (t) => t.name == m.awayTeam.name,
-        orElse: () =>
-            Team(name: m.awayTeam.name, players: [], logo: m.awayTeam.logo),
+        (t) => (t.backendId != null && t.backendId == m.awayTeam.backendId) || t.name == m.awayTeam.name,
+        orElse: () => m.awayTeam,
       );
 
       home.played = (home.played ?? 0) + 1;
       away.played = (away.played ?? 0) + 1;
-      for (var p in home.players) {
-        p.played = home.played!;
-      }
-      for (var p in away.players) {
-        p.played = away.played!;
-      }
 
       home.goalsFor = (home.goalsFor ?? 0) + m.homeTeamScore!;
       home.goalsAgainst = (home.goalsAgainst ?? 0) + m.awayTeamScore!;
@@ -111,6 +106,10 @@ class League extends HiveObject {
         away.points = (away.points ?? 0) + 1;
       }
     }
+
+    for (var t in teams) {
+      t.diff_goals = (t.goalsFor ?? 0) - (t.goalsAgainst ?? 0);
+    }
   }
 
   // ─────────────────────────────────────────────────
@@ -124,7 +123,7 @@ class League extends HiveObject {
     // Sort by goals descending
     scorers.sort((a, b) => b.goals.compareTo(a.goals));
     // Store in topScorers list
-    topScorers = scorers.cast<Player>();
+    topScorers = scorers;
   }
 
   // ─────────────────────────────────────────────────
@@ -138,6 +137,6 @@ class League extends HiveObject {
     // Sort by assists descending
     assistants.sort((a, b) => b.assists.compareTo(a.assists));
     // Store in topAssistants list
-    topAssistants = assistants.cast<Player>();
+    topAssistants = assistants;
   }
 }

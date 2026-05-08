@@ -14,34 +14,37 @@ class MatchStats extends HiveObject {
   String teamId;
 
   @HiveField(3)
-  int passesCount;
+  int? passesCount;
 
   @HiveField(4)
-  int goalCount;
+  int? goalCount;
 
   @HiveField(5)
-  int foulCount;
+  int? foulCount;
 
   @HiveField(6)
-  int yellowCardCount;
+  int? yellowCardCount;
 
   @HiveField(7)
-  int redCardCount;
+  int? redCardCount;
 
   @HiveField(8)
-  int goalkeeperSaves;
+  int? goalkeeperSaves;
 
   @HiveField(9)
-  int cornerCount;
+  int? cornerCount;
 
   @HiveField(10)
   String? mvpName;
 
   @HiveField(11)
-  int ownGoals;
+  int? ownGoals;
 
   @HiveField(12)
-  int freeKicks;
+  int? freeKicks;
+
+  @HiveField(13)
+  double? acquisitionAvg;
 
   MatchStats({
     this.backendId,
@@ -57,5 +60,6 @@ class MatchStats extends HiveObject {
     this.mvpName,
     this.ownGoals = 0,
     this.freeKicks = 0,
+    this.acquisitionAvg = 0.0,
   });
 }
