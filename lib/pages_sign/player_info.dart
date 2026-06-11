@@ -11,12 +11,13 @@ class PlayerInfoPage extends StatefulWidget {
   final String? email;
   final String? phone;
   final Map<String, String> users;
-  const PlayerInfoPage(
-      {super.key,
-      required this.userName,
-      this.email,
-      this.phone,
-      required this.users});
+  const PlayerInfoPage({
+    super.key,
+    required this.userName,
+    this.email,
+    this.phone,
+    required this.users,
+  });
 
   @override
   State<PlayerInfoPage> createState() => _PlayerInfoPageState();
@@ -27,16 +28,36 @@ class _PlayerInfoPageState extends State<PlayerInfoPage> {
   final _nationalityController = TextEditingController();
   final _heightController = TextEditingController();
   final _weightController = TextEditingController();
+  final _phoneController = TextEditingController();
+  
   DateTime? _selectedDob;
   String _selectedPosition = 'Forward';
+  dynamic _selectedTeamId;
+  List<dynamic> _teams = [];
   bool _isLoading = false;
+  bool _fetchingTeams = true;
 
-  final List<String> _positions = [
-    'Goalkeeper',
-    'Defender',
-    'Midfielder',
-    'Forward'
-  ];
+  final List<String> _positions = ['Goalkeeper', 'Defender', 'Midfielder', 'Forward'];
+
+  @override
+  void initState() {
+    super.initState();
+    _phoneController.text = widget.phone ?? '';
+    _loadTeams();
+  }
+
+  Future<void> _loadTeams() async {
+    try {
+      final teams = await ApiService.fetchTeams();
+      setState(() {
+        _teams = teams;
+        _fetchingTeams = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading teams: $e');
+      setState(() => _fetchingTeams = false);
+    }
+  }
 
   Future<void> _selectDate(Color primary) async {
     final picked = await showDatePicker(
@@ -59,13 +80,10 @@ class _PlayerInfoPageState extends State<PlayerInfoPage> {
     if (_selectedDob == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Please select your date of birth.',
-              style: GoogleFonts.inter(
-                  fontWeight: FontWeight.w600, color: Colors.white)),
+          content: Text('Please select your date of birth.', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: Colors.white)),
           backgroundColor: AppColors.darkError,
           behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
         ),
       );
@@ -85,19 +103,17 @@ class _PlayerInfoPageState extends State<PlayerInfoPage> {
         weight: double.tryParse(_weightController.text) ?? 0.0,
         position: _selectedPosition,
         email: widget.email ?? user.email ?? 'no-email@example.com',
-        phoneNumber: widget.phone ?? '0000000000',
+        phoneNumber: _phoneController.text.trim(),
+        teamId: _selectedTeamId,
       );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Player profile created! Please sign in.',
-                style: GoogleFonts.inter(
-                    fontWeight: FontWeight.w600, color: Colors.white)),
+            content: Text('Player profile created! Please sign in.', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: Colors.white)),
             backgroundColor: AppColors.darkPrimary,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             margin: const EdgeInsets.all(16),
           ),
         );
@@ -107,17 +123,14 @@ class _PlayerInfoPageState extends State<PlayerInfoPage> {
           (route) => false,
         );
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to save profile. Please try again.',
-                style: GoogleFonts.inter(
-                    fontWeight: FontWeight.w600, color: Colors.white)),
+            content: Text('Failed to save profile: $e', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: Colors.white)),
             backgroundColor: AppColors.darkError,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             margin: const EdgeInsets.all(16),
           ),
         );
@@ -132,6 +145,7 @@ class _PlayerInfoPageState extends State<PlayerInfoPage> {
     _nationalityController.dispose();
     _heightController.dispose();
     _weightController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -154,11 +168,7 @@ class _PlayerInfoPageState extends State<PlayerInfoPage> {
           icon: Icon(Icons.arrow_back_ios_rounded, size: 18, color: textPri),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text('Player Details',
-            style: GoogleFonts.inter(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: textPri)),
+        title: Text('Player Details', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: textPri)),
       ),
       body: SafeArea(
         top: false,
@@ -171,140 +181,81 @@ class _PlayerInfoPageState extends State<PlayerInfoPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Complete your player profile',
-                        style: GoogleFonts.inter(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: textSec,
-                            letterSpacing: 1.2)),
+                    Text('Complete your player profile', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: textSec, letterSpacing: 1.2)),
                     const SizedBox(height: 16),
 
-                    // Fields card
                     Container(
-                      decoration: BoxDecoration(
-                        color: cardBg,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: divider),
-                      ),
+                      decoration: BoxDecoration(color: cardBg, borderRadius: BorderRadius.circular(16), border: Border.all(color: divider)),
                       child: Column(
                         children: [
-                          // Date of Birth
+                          _fieldRow(controller: _phoneController, label: 'Phone Number', icon: Icons.phone_outlined, primary: primary, textPri: textPri, textSec: textSec, divider: divider, keyboardType: TextInputType.phone, validator: (v) => v!.isEmpty ? 'Enter phone number' : null),
+                          Divider(height: 1, color: divider, indent: 54),
+                          
+                          // Team Selection Dropdown
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                            child: Row(
+                              children: [
+                                Container(width: 36, height: 36, decoration: BoxDecoration(color: primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: Icon(Icons.group_outlined, color: primary, size: 18)),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _fetchingTeams 
+                                    ? const LinearProgressIndicator() 
+                                    : DropdownButtonHideUnderline(
+                                        child: DropdownButton<dynamic>(
+                                          value: _selectedTeamId,
+                                          hint: Text('Select Team', style: GoogleFonts.inter(fontSize: 14, color: textSec)),
+                                          isExpanded: true,
+                                          dropdownColor: cardBg,
+                                          items: _teams.map((t) => DropdownMenuItem(value: t['team_id'], child: Text(t['team_name'] ?? 'Unknown', style: GoogleFonts.inter(fontSize: 14, color: textPri)))).toList(),
+                                          onChanged: (v) => setState(() => _selectedTeamId = v),
+                                        ),
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Divider(height: 1, color: divider, indent: 54),
+
                           InkWell(
                             onTap: () => _selectDate(primary),
-                            borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(16)),
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 14),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                               child: Row(
                                 children: [
-                                  Container(
-                                    width: 36, height: 36,
-                                    decoration: BoxDecoration(
-                                      color: primary.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Icon(Icons.calendar_today_outlined,
-                                        color: primary, size: 18),
-                                  ),
+                                  Container(width: 36, height: 36, decoration: BoxDecoration(color: primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: Icon(Icons.calendar_today_outlined, color: primary, size: 18)),
                                   const SizedBox(width: 12),
-                                  Text(
-                                    _selectedDob == null
-                                        ? 'Date of Birth'
-                                        : DateFormat('dd MMM yyyy')
-                                            .format(_selectedDob!),
-                                    style: GoogleFonts.inter(
-                                      fontSize: 14,
-                                      color: _selectedDob == null
-                                          ? textSec
-                                          : textPri,
-                                    ),
-                                  ),
+                                  Text(_selectedDob == null ? 'Date of Birth' : DateFormat('dd MMM yyyy').format(_selectedDob!), style: GoogleFonts.inter(fontSize: 14, color: _selectedDob == null ? textSec : textPri)),
                                 ],
                               ),
                             ),
                           ),
                           Divider(height: 1, color: divider, indent: 54),
-                          _fieldRow(
-                            controller: _nationalityController,
-                            label: 'Nationality',
-                            icon: Icons.flag_outlined,
-                            primary: primary, textPri: textPri,
-                            textSec: textSec, divider: divider,
-                            validator: (v) =>
-                                v!.isEmpty ? 'Enter nationality' : null,
-                          ),
+                          _fieldRow(controller: _nationalityController, label: 'Nationality', icon: Icons.flag_outlined, primary: primary, textPri: textPri, textSec: textSec, divider: divider, validator: (v) => v!.isEmpty ? 'Enter nationality' : null),
                           Divider(height: 1, color: divider, indent: 54),
                           Row(
                             children: [
-                              Expanded(
-                                child: _fieldRow(
-                                  controller: _heightController,
-                                  label: 'Height (cm)',
-                                  icon: Icons.height,
-                                  primary: primary, textPri: textPri,
-                                  textSec: textSec, divider: divider,
-                                  keyboardType: TextInputType.number,
-                                  validator: (v) =>
-                                      v!.isEmpty ? 'Enter height' : null,
-                                ),
-                              ),
-                              Container(
-                                  width: 1,
-                                  height: 52,
-                                  color: divider),
-                              Expanded(
-                                child: _fieldRow(
-                                  controller: _weightController,
-                                  label: 'Weight (kg)',
-                                  icon: Icons.monitor_weight_outlined,
-                                  primary: primary, textPri: textPri,
-                                  textSec: textSec, divider: divider,
-                                  keyboardType: TextInputType.number,
-                                  validator: (v) =>
-                                      v!.isEmpty ? 'Enter weight' : null,
-                                ),
-                              ),
+                              Expanded(child: _fieldRow(controller: _heightController, label: 'Height (cm)', icon: Icons.height, primary: primary, textPri: textPri, textSec: textSec, divider: divider, keyboardType: TextInputType.number, validator: (v) => v!.isEmpty ? 'Enter height' : null)),
+                              Container(width: 1, height: 52, color: divider),
+                              Expanded(child: _fieldRow(controller: _weightController, label: 'Weight (kg)', icon: Icons.monitor_weight_outlined, primary: primary, textPri: textPri, textSec: textSec, divider: divider, keyboardType: TextInputType.number, validator: (v) => v!.isEmpty ? 'Enter weight' : null)),
                             ],
                           ),
                           Divider(height: 1, color: divider, indent: 54),
-                          // Position dropdown
                           Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                             child: Row(
                               children: [
-                                Container(
-                                  width: 36, height: 36,
-                                  decoration: BoxDecoration(
-                                    color: primary.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Icon(Icons.sports_soccer_outlined,
-                                      color: primary, size: 18),
-                                ),
+                                Container(width: 36, height: 36, decoration: BoxDecoration(color: primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: Icon(Icons.sports_soccer_outlined, color: primary, size: 18)),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: DropdownButtonHideUnderline(
                                     child: DropdownButton<String>(
                                       value: _selectedPosition,
                                       dropdownColor: cardBg,
-                                      style: GoogleFonts.inter(
-                                          fontSize: 14, color: textPri),
-                                      icon: Icon(
-                                          Icons.keyboard_arrow_down_rounded,
-                                          color: textSec),
-                                      items: _positions
-                                          .map((p) => DropdownMenuItem(
-                                                value: p,
-                                                child: Text(p,
-                                                    style: GoogleFonts.inter(
-                                                        fontSize: 14,
-                                                        color: textPri)),
-                                              ))
-                                          .toList(),
-                                      onChanged: (v) => setState(
-                                          () => _selectedPosition = v!),
+                                      style: GoogleFonts.inter(fontSize: 14, color: textPri),
+                                      items: _positions.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
+                                      onChanged: (v) => setState(() => _selectedPosition = v!),
                                     ),
                                   ),
                                 ),
@@ -316,69 +267,31 @@ class _PlayerInfoPageState extends State<PlayerInfoPage> {
                     ),
 
                     const SizedBox(height: 32),
-
                     SizedBox(
                       width: double.infinity,
                       height: 52,
                       child: ElevatedButton(
                         onPressed: _isLoading ? null : _submit,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primary,
-                          foregroundColor: Colors.black,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14)),
-                          elevation: 0,
-                        ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 22, height: 22,
-                                child: CircularProgressIndicator(
-                                    color: Colors.black, strokeWidth: 2.5))
-                            : Text('Complete Sign Up',
-                                style: GoogleFonts.inter(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 16)),
+                        child: _isLoading ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2.5)) : const Text('Complete Sign Up'),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-            if (_isLoading)
-              Container(
-                color: Colors.black.withValues(alpha: 0.3),
-                child: Center(
-                    child: CircularProgressIndicator(color: primary)),
-              ),
+            if (_isLoading) Container(color: Colors.black.withValues(alpha: 0.3), child: Center(child: CircularProgressIndicator(color: primary))),
           ],
         ),
       ),
     );
   }
 
-  Widget _fieldRow({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    required Color primary,
-    required Color textPri,
-    required Color textSec,
-    required Color divider,
-    TextInputType keyboardType = TextInputType.text,
-    String? Function(String?)? validator,
-  }) {
+  Widget _fieldRow({required TextEditingController controller, required String label, required IconData icon, required Color primary, required Color textPri, required Color textSec, required Color divider, TextInputType keyboardType = TextInputType.text, String? Function(String?)? validator}) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Row(
         children: [
-          Container(
-            width: 36, height: 36,
-            decoration: BoxDecoration(
-              color: primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: primary, size: 18),
-          ),
+          Container(width: 36, height: 36, decoration: BoxDecoration(color: primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: primary, size: 18)),
           const SizedBox(width: 12),
           Expanded(
             child: TextFormField(
@@ -386,17 +299,7 @@ class _PlayerInfoPageState extends State<PlayerInfoPage> {
               keyboardType: keyboardType,
               validator: validator,
               style: GoogleFonts.inter(fontSize: 14, color: textPri),
-              decoration: InputDecoration(
-                hintText: label,
-                hintStyle:
-                    GoogleFonts.inter(color: textSec, fontSize: 13),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                errorBorder: InputBorder.none,
-                contentPadding:
-                    const EdgeInsets.symmetric(vertical: 14),
-              ),
+              decoration: InputDecoration(hintText: label, hintStyle: GoogleFonts.inter(color: textSec, fontSize: 13), border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(vertical: 14)),
             ),
           ),
         ],

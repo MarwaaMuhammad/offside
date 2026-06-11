@@ -5,6 +5,7 @@ import 'package:offside/navbar.dart';
 import 'package:offside/services/api_service.dart';
 import 'package:offside/theme_provider.dart';
 import 'sign_up.dart';
+import 'role_selection.dart';
 
 class SignInPage extends StatefulWidget {
   final Map<String, String> users;
@@ -33,22 +34,51 @@ class _SignInPageState extends State<SignInPage> {
     setState(() { _isLoading = true; _error = ''; });
 
     try {
+      debugPrint('🔑 [SignIn] Step 1: Initiating signInWithPassword for $email...');
       final AuthResponse res = await Supabase.instance.client.auth
-          .signInWithPassword(email: email, password: password);
+          .signInWithPassword(email: email, password: password)
+          .timeout(const Duration(seconds: 15));
+      
+      debugPrint('🔑 [SignIn] Step 2: Auth call success. User UID: ${res.user?.id}');
 
       if (res.user != null && mounted) {
         // Determine role
         String role = 'user';
         String? userName;
+        bool hasProfile = false;
         try {
-          final data = await ApiService.fetchUserData(email);
+          debugPrint('🔑 [SignIn] Step 3: Fetching user data from ApiService...');
+          final data = await ApiService.fetchUserData(email)
+              .timeout(const Duration(seconds: 10));
+          debugPrint('🔑 [SignIn] Step 4: User data fetch result: $data');
           if (data != null) {
+            hasProfile = true;
             role = data['role'] ?? 'user';
             userName = data['full_name'] ?? data['name'];
           }
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('⚠️ [SignIn] Error fetching user data (will fall back to default role): $e');
+        }
 
         if (!mounted) return;
+
+        if (!hasProfile) {
+          debugPrint('⚠️ [SignIn] No database profile found. Redirecting to RoleSelectionPage...');
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => RoleSelectionPage(
+                userName: email.split('@').first,
+                email: email,
+                phone: '',
+                users: widget.users,
+              ),
+            ),
+          );
+          return;
+        }
+
+        debugPrint('🔑 [SignIn] Step 5: Navigating to OffsideShell with role=$role...');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -58,11 +88,15 @@ class _SignInPageState extends State<SignInPage> {
             ),
           ),
         );
+      } else if (mounted) {
+        setState(() => _error = 'Sign-in completed but user profile is null.');
       }
     } on AuthException catch (e) {
+      debugPrint('❌ [SignIn] AuthException: ${e.message}');
       setState(() => _error = e.message);
-    } catch (_) {
-      setState(() => _error = 'An unexpected error occurred.');
+    } catch (e, stack) {
+      debugPrint('❌ [SignIn] Unexpected error: $e\n$stack');
+      setState(() => _error = 'An unexpected error occurred: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -125,6 +159,7 @@ class _SignInPageState extends State<SignInPage> {
                     textSec: textSec,
                     divider: divider,
                     keyboardType: TextInputType.emailAddress,
+                    autofillHints: const [AutofillHints.email],
                   ),
 
                   const SizedBox(height: 14),
@@ -140,6 +175,7 @@ class _SignInPageState extends State<SignInPage> {
                     textSec: textSec,
                     divider: divider,
                     obscure: _obscurePassword,
+                    autofillHints: const [AutofillHints.password],
                     suffix: IconButton(
                       icon: Icon(
                         _obscurePassword
@@ -253,6 +289,7 @@ class _SignInPageState extends State<SignInPage> {
     TextInputType keyboardType = TextInputType.text,
     bool obscure = false,
     Widget? suffix,
+    Iterable<String>? autofillHints,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -265,6 +302,7 @@ class _SignInPageState extends State<SignInPage> {
         obscureText: obscure,
         keyboardType: keyboardType,
         style: GoogleFonts.inter(fontSize: 15, color: textPri),
+        autofillHints: autofillHints,
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: GoogleFonts.inter(color: textSec, fontSize: 14),

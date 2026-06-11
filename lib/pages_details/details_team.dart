@@ -106,6 +106,7 @@ class _TeamDetailsPageState extends State<TeamDetailsPage>
                           _kitDot(widget.team.goalkeeperColor),
                         ],
                       ),
+                      SizedBox.fromSize(size: const Size.fromHeight(20))
                     ],
                   ),
                 ),

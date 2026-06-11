@@ -13,18 +13,37 @@ class _ApiTestPageState extends State<ApiTestPage> {
   bool _loading = false;
 
   void _addLog(String msg) {
+    if (!mounted) return;
     setState(() => _log.insert(0, "${DateTime.now().toIso8601String().substring(11, 19)}  $msg"));
   }
 
   Future<void> _testPing() async {
     setState(() => _loading = true);
-    final alive = await ApiService.ping();
-    if (alive) {
+    try {
+      await ApiService.ping();
       _addLog("✅ Server is REACHABLE");
-    } else {
-      _addLog("❌ Server UNREACHABLE (Check internet/IP)");
+    } on ApiException catch (e) {
+      _addLog("❌ Ping Failed (${e.statusCode}): ${e.message}");
+    } catch (e) {
+      _addLog("❌ Ping Error: $e");
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
-    setState(() => _loading = false);
+  }
+
+  Future<void> _testGetTournaments() async {
+    setState(() => _loading = true);
+    try {
+      final result = await ApiService.getTournaments();
+      _addLog("✅ GET tournaments SUCCESS");
+      _addLog("   Found ${result.length} items");
+    } on ApiException catch (e) {
+      _addLog("❌ GET Error ${e.statusCode}: ${e.message}");
+    } catch (e) {
+      _addLog("❌ Unexpected Error: $e");
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   Future<void> _testCreateTournament() async {
@@ -35,14 +54,14 @@ class _ApiTestPageState extends State<ApiTestPage> {
         startDate: DateTime.now(),
         endDate: DateTime.now().add(const Duration(days: 30)),
       );
-      _addLog("✅ POST /tournaments SUCCESS");
-      _addLog("   ID: ${result['id'] ?? result['tournament_id']}");
+      _addLog("✅ POST tournament SUCCESS");
+      _addLog("   New ID: ${result['tournament_id'] ?? result['id']}");
     } on ApiException catch (e) {
-      _addLog("❌ ${e.statusCode}: ${e.message}");
+      _addLog("❌ POST Error ${e.statusCode}: ${e.message}");
     } catch (e) {
-      _addLog("❌ $e");
+      _addLog("❌ Unexpected Error: $e");
     } finally {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -52,7 +71,7 @@ class _ApiTestPageState extends State<ApiTestPage> {
       backgroundColor: const Color(0xFF0E1126),
       appBar: AppBar(
         backgroundColor: const Color(0xFF16246E),
-        title: const Text("🛠️ Backend Connection Test", style: TextStyle(color: Colors.white)),
+        title: const Text("🛠️ API Connection Test", style: TextStyle(color: Colors.white)),
         leading: const BackButton(color: Colors.white),
       ),
       body: Column(
@@ -61,7 +80,7 @@ class _ApiTestPageState extends State<ApiTestPage> {
             width: double.infinity,
             color: const Color(0xFF1C2C7A),
             padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-            child: Text("Base URL: ${ApiService.baseUrl}", style: const TextStyle(color: Colors.white70, fontSize: 12)),
+            child: const Text("Base URL: ${ApiService.baseUrl}", style: TextStyle(color: Colors.white70, fontSize: 12)),
           ),
           Padding(
             padding: const EdgeInsets.all(12),
@@ -69,9 +88,10 @@ class _ApiTestPageState extends State<ApiTestPage> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                _btn("Ping Server", _testPing, const Color(0xFF0066FF)),
-                _btn("POST tournament", _testCreateTournament, Colors.blue),
-                _btn("Clear log", () => setState(() => _log.clear()), Colors.red),
+                _btn("Ping", _testPing, Colors.green),
+                _btn("GET Tournaments", _testGetTournaments, Colors.teal),
+                _btn("POST Tournament", _testCreateTournament, Colors.blue),
+                _btn("Clear", () => setState(() => _log.clear()), Colors.red),
               ],
             ),
           ),

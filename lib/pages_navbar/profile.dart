@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:offside/models/leage_model.dart';
 import 'package:offside/models/user_model.dart';
 import 'package:offside/pages_sign/sign_in.dart';
+import 'package:offside/pages_sign/role_selection.dart';
 import 'package:offside/services/api_service.dart';
 import 'package:offside/theme_provider.dart';
 import 'package:offside/pages_navbar/player_activity_page.dart';
@@ -198,6 +199,31 @@ class _ProfilePageState extends State<ProfilePage> {
                 const SizedBox(height: 16),
                 Text(_error!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
                 const SizedBox(height: 24),
+                if (_error!.contains('fully set up')) ...[
+                  ElevatedButton(
+                    onPressed: () {
+                      final email = Supabase.instance.client.auth.currentUser?.email;
+                      if (email != null) {
+                        Navigator.of(context, rootNavigator: true).push(
+                          MaterialPageRoute(
+                            builder: (_) => RoleSelectionPage(
+                              userName: email.split('@').first,
+                              email: email,
+                              phone: '',
+                              users: const {},
+                            ),
+                          ),
+                        ).then((_) => _loadUserProfile());
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primary,
+                      foregroundColor: isDark ? Colors.black : Colors.white,
+                    ),
+                    child: const Text("Set Up Profile"),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 ElevatedButton(onPressed: _loadUserProfile, child: const Text("Retry")),
                 TextButton(onPressed: _signOut, child: const Text("Sign Out", style: TextStyle(color: Colors.red))),
               ],

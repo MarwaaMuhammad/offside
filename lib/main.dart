@@ -1,4 +1,6 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/adapters.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:offside/models/event_model.dart';
@@ -15,7 +17,40 @@ import 'package:offside/theme_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
+  // 🛠️ Ignore noisy framework-level font assertion errors that crash the app in web/debug
+  final originalOnError = FlutterError.onError;
+  FlutterError.onError = (FlutterErrorDetails details) {
+    final exceptionStr = details.exception.toString();
+    if (exceptionStr.contains('_scheduleSystemFontsUpdate') ||
+        exceptionStr.contains('RenderParagraph._scheduleSystemFontsUpdate')) {
+      debugPrint('Ignored framework font assertion: $exceptionStr');
+      return;
+    }
+    originalOnError?.call(details);
+  };
+
+  PlatformDispatcher.instance.onError = (error, stack) {
+    final errorStr = error.toString();
+    if (errorStr.contains('_scheduleSystemFontsUpdate') ||
+        errorStr.contains('RenderParagraph._scheduleSystemFontsUpdate')) {
+      debugPrint('Ignored async/platform font assertion: $errorStr');
+      return true; // Mark as handled
+    }
+    return false; // Let other handlers handle it
+  };
+
+  // 🚀 Start preloading Google Fonts in the background
+  // We don't await this so it doesn't block app startup, but starts the download immediately.
+  GoogleFonts.pendingFonts([
+    GoogleFonts.inter(),
+    GoogleFonts.inter(fontWeight: FontWeight.w500),
+    GoogleFonts.inter(fontWeight: FontWeight.w600),
+    GoogleFonts.inter(fontWeight: FontWeight.w700),
+    GoogleFonts.inter(fontWeight: FontWeight.w800),
+    GoogleFonts.inter(fontWeight: FontWeight.w900),
+  ]);
+
   // 🚀 Initialize Supabase
   await Supabase.initialize(
     url: 'https://gsvowvzdxphlguclawur.supabase.co',
