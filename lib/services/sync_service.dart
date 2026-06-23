@@ -13,7 +13,7 @@ class SyncService {
   //  SAFE FETCH HELPER
   //  Wraps a single API call; returns [] on any error and logs fully.
   // ─────────────────────────────────────────────────────────────────
-  static Future<List<dynamic>> _safeFetch(
+  static Future<List<dynamic>?> _safeFetch(
     String tableName,
     Future<List<dynamic>> Function() fetcher,
   ) async {
@@ -27,11 +27,11 @@ class SyncService {
       debugPrint('   URL    : ${e.url ?? "unknown"}');
       debugPrint('   Body   : ${e.message.length > 500 ? '${e.message.substring(0, 500)}…' : e.message}');
       debugPrint('   Stack  : $stack');
-      return [];
+      return null;
     } catch (e, stack) {
       debugPrint('❌ [Sync] $tableName unexpected error: $e');
       debugPrint('   Stack  : $stack');
-      return [];
+      return null;
     }
   }
 
@@ -48,6 +48,16 @@ class SyncService {
     final playersJson     = await _safeFetch('PLAYERS',     ApiService.getAllPlayers);
     final playerStatsJson = await _safeFetch('PLAYER_MATCH_STATS', ApiService.fetchPlayerMatchStats);
     final teamStatsJson   = await _safeFetch('TEAM_MATCH_STATS',   ApiService.fetchTeamMatchStats);
+
+    if (tournamentsJson == null ||
+        teamsJson == null ||
+        matchesJson == null ||
+        playersJson == null ||
+        playerStatsJson == null ||
+        teamStatsJson == null) {
+      debugPrint('⚠️ [Sync] One or more tables failed to fetch. Preserving local database.');
+      return;
+    }
 
     debugPrint('📊 [Sync] Received: ${tournamentsJson.length} tournaments, '
         '${teamsJson.length} teams, ${matchesJson.length} matches, '
@@ -162,7 +172,7 @@ class SyncService {
           logo:            tJson['logo_url']                ?? 'asset/Teams_Logo/1.png',
           players:         teamPlayersMap[tId]              ?? [],
           primaryColor:    tJson['primary_tshirt_colors'],
-          secondaryColor:  tJson['secondary_tshirt_colors'],
+          secondaryColor:  tJson['secondary _tshirt_colors'] ?? tJson['secondary_tshirt_colors'],
           goalkeeperColor: tJson['goalkeeper_tshirt_colors'],
           backendId:       tId,
         );

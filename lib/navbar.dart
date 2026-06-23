@@ -5,7 +5,7 @@ import 'package:offside/pages_navbar/analysis.dart';
 import 'package:offside/pages_navbar/matchs.dart';
 import 'package:offside/pages_navbar/players.dart';
 import 'package:offside/pages_navbar/profile.dart';
-import 'package:offside/pages_navbar/notifications.dart';
+import 'package:offside/pages_add/add_league.dart';
 import 'package:offside/theme_provider.dart';
 
 class OffsideShell extends StatefulWidget {
@@ -27,10 +27,8 @@ class _OffsideShellState extends State<OffsideShell>
   void initState() {
     super.initState();
     _pages = [
-      const MatchesPage(),
+      MatchesPage(userRole: widget.userRole, userName: widget.userName),
       AnalysisPage(userRole: widget.userRole),
-      NotificationsPage(
-          userRole: widget.userRole, currentUserEmail: widget.userName),
       const PlayersPage(),
       const ProfilePage(),
     ];
@@ -75,20 +73,22 @@ class _OffsideShellState extends State<OffsideShell>
           label: 'Analysis',
           icon: 'asset/icons/analysis.svg',
           isSvg: true),
+      if (widget.userRole != 'player')
+        _NavItem(
+            index: -1,
+            label: 'Create Team',
+            icon: '',
+            isSvg: false,
+            materialIcon: Icons.add,
+            materialIconActive: Icons.add,
+            isAction: true),
       _NavItem(
           index: 2,
-          label: 'Alerts',
-          icon: 'asset/icons/notification.svg',
-          isSvg: false,
-          materialIcon: Icons.notifications_outlined,
-          materialIconActive: Icons.notifications),
-      _NavItem(
-          index: 3,
           label: 'Players',
           icon: 'asset/icons/play-football.svg',
           isSvg: true),
       _NavItem(
-          index: 4,
+          index: 3,
           label: widget.userRole == 'player' ? 'My Profile' : 'Profile',
           icon: 'asset/icons/profile.svg',
           isSvg: true),
@@ -120,12 +120,21 @@ class _OffsideShellState extends State<OffsideShell>
   }
 
   Widget _buildTab(_NavItem item, bool isDark) {
-    final isSelected = _index == item.index;
+    final isSelected = !item.isAction && _index == item.index;
     final primary = isDark ? AppColors.darkPrimary : AppColors.lightPrimary;
     final inactive = isDark ? AppColors.darkTextSec : AppColors.lightTextSec;
 
     return GestureDetector(
-      onTap: () => _onTabTap(item.index),
+      onTap: () {
+        if (item.isAction) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const CreateLeaguePage()),
+          );
+        } else {
+          _onTabTap(item.index);
+        }
+      },
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -174,7 +183,7 @@ class _OffsideShellState extends State<OffsideShell>
                       isSelected
                           ? item.materialIconActive
                           : item.materialIcon,
-                      color: isSelected ? primary : inactive,
+                      color: item.isAction ? primary : (isSelected ? primary : inactive),
                       size: 22,
                     ),
             ),
@@ -186,7 +195,7 @@ class _OffsideShellState extends State<OffsideShell>
                 fontSize: 10,
                 fontWeight:
                     isSelected ? FontWeight.w700 : FontWeight.w400,
-                color: isSelected ? primary : inactive,
+                color: item.isAction ? primary : (isSelected ? primary : inactive),
               ),
               child: Text(item.label),
             ),
@@ -204,6 +213,7 @@ class _NavItem {
   final bool isSvg;
   final IconData? materialIcon;
   final IconData? materialIconActive;
+  final bool isAction;
 
   _NavItem({
     required this.index,
@@ -212,5 +222,6 @@ class _NavItem {
     required this.isSvg,
     this.materialIcon,
     this.materialIconActive,
+    this.isAction = false,
   });
 }

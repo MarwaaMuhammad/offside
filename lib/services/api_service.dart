@@ -167,9 +167,8 @@ class ApiService {
         headers: _authHeaders,
         body: jsonEncode({
           'team_name': name,
-          'logo_url': logo,
           'primary_tshirt_colors': primaryColor,
-          'secondary_tshirt_colors': secondaryColor,
+          'secondary _tshirt_colors': secondaryColor,
           'goalkeeper_tshirt_colors': goalkeeperColor,
         }),
       ),

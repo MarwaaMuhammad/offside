@@ -1,14 +1,18 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:offside/models/leage_model.dart';
 import 'package:offside/models/match_model.dart';
 import 'package:offside/pages_details/details_match.dart';
+import 'package:offside/pages_details/favorites_page.dart';
+import 'package:offside/pages_navbar/notifications.dart';
 import 'package:offside/theme_provider.dart';
 
 class MatchesPage extends StatefulWidget {
-  const MatchesPage({super.key});
+  final String userRole;
+  final String? userName;
+  const MatchesPage({super.key, this.userRole = 'user', this.userName});
 
   @override
   State<MatchesPage> createState() => _MatchesPageState();
@@ -84,6 +88,62 @@ class _MatchesPageState extends State<MatchesPage>
                     ),
                   ),
                   const Spacer(),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => FavoritesPage(
+                            userRole: widget.userRole,
+                            userName: widget.userName,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: cardBg,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isDark
+                              ? AppColors.darkDivider
+                              : AppColors.lightDivider,
+                        ),
+                      ),
+                      child: Icon(Icons.star_outline_rounded,
+                          color: primary, size: 18),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => NotificationsPage(
+                            userRole: widget.userRole,
+                            currentUserEmail: widget.userName,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: cardBg,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isDark
+                              ? AppColors.darkDivider
+                              : AppColors.lightDivider,
+                        ),
+                      ),
+                      child: Icon(Icons.notifications_outlined,
+                          color: primary, size: 18),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   GestureDetector(
                     onTap: () async {
                       final picked = await showDatePicker(

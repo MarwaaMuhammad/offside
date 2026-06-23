@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:offside/models/leage_model.dart';
 import 'package:offside/models/team_model.dart';
-import 'package:offside/pages_add/add_league.dart';
 import 'package:offside/pages_details/details_league.dart';
 import 'package:offside/pages_details/details_team.dart';
 import 'package:offside/theme_provider.dart';
@@ -54,43 +53,6 @@ class _AnalysisPageState extends State<AnalysisPage> {
                               fontSize: 12, color: textSec)),
                     ],
                   ),
-                  const Spacer(),
-                  // Add League button — hidden for players
-                  if (widget.userRole != 'player')
-                    GestureDetector(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const CreateLeaguePage()),
-                      ),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: primary,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: primary.withValues(alpha: 0.35),
-                              blurRadius: 10,
-                              offset: const Offset(0, 3),
-                            )
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.add,
-                                color: Colors.black, size: 16),
-                            const SizedBox(width: 5),
-                            Text('League',
-                                style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.black)),
-                          ],
-                        ),
-                      ),
-                    ),
                 ],
               ),
             ),
@@ -165,25 +127,12 @@ class _AnalysisPageState extends State<AnalysisPage> {
                           const SizedBox(height: 16),
                           Text(
                             all.isEmpty
-                                ? 'No leagues yet.\nTap + League to create one!'
+                                ? 'No leagues yet.\nTap Create Match in the navigation bar to create one!'
                                 : 'No results found',
                             textAlign: TextAlign.center,
                             style: GoogleFonts.inter(
                                 fontSize: 15, color: textSec),
                           ),
-                          if (all.isEmpty && widget.userRole != 'player') ...[
-                            const SizedBox(height: 24),
-                            ElevatedButton.icon(
-                              onPressed: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) =>
-                                        const CreateLeaguePage()),
-                              ),
-                              icon: const Icon(Icons.add),
-                              label: const Text('Create League'),
-                            ),
-                          ],
                         ],
                       ),
                     );

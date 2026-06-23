@@ -11,6 +11,7 @@ import 'package:offside/services/api_service.dart';
 import 'package:offside/theme_provider.dart';
 import 'package:offside/pages_navbar/player_activity_page.dart';
 import 'package:offside/pages_navbar/edit_profile.dart';
+import 'package:offside/pages_details/favorites_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -334,6 +335,17 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                       );
                     }),
+                  
+                  settingTile(Icons.star_outline_rounded, "Favorite Team & Player", () {
+                    Navigator.of(context, rootNavigator: true).push(
+                      MaterialPageRoute(
+                        builder: (_) => FavoritesPage(
+                          userRole: _userModel?.role ?? 'user',
+                          userName: _userModel?.email,
+                        ),
+                      ),
+                    ).then((_) => _loadUserProfile());
+                  }),
                   
                   // Dark Mode Toggle Tile
                   Container(

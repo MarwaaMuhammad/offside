@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:offside/models/invitation_model.dart';
@@ -55,9 +55,14 @@ class _NotificationsPageState extends State<NotificationsPage>
             // ── Header ───────────────────────────────
             Padding(
               padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
               child: Row(
                 children: [
+                  IconButton(
+                    icon: Icon(Icons.arrow_back_ios_rounded, size: 18, color: textPri),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(width: 4),
                   Text(
                     'Notifications',
                     style: GoogleFonts.inter(
